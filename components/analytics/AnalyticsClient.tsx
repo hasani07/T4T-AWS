@@ -7,6 +7,7 @@ import { computeStats, fetchReadings, PeriodStats } from "@/lib/statsEngine";
 import PeriodSelector from "./PeriodSelector";
 import StatsSummary from "./StatsSummary";
 import TrendChart from "./TrendChart";
+import LocationComparison from "./LocationComparison";
 
 export default function AnalyticsClient({ devices }: { devices: Device[] }) {
   const [deviceId, setDeviceId] = useState<number | null>(devices[0]?.id ?? null);
@@ -18,6 +19,7 @@ export default function AnalyticsClient({ devices }: { devices: Device[] }) {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [currentStats, setCurrentStats] = useState<PeriodStats | null>(null);
   const [previousStats, setPreviousStats] = useState<PeriodStats | null>(null);
+  const [statsByDevice, setStatsByDevice] = useState<Record<number, PeriodStats | null>>({});
 
   useEffect(() => {
     if (!deviceId) return;
@@ -32,13 +34,29 @@ export default function AnalyticsClient({ devices }: { devices: Device[] }) {
         const range = getPeriodRange(preset, customStart, customEnd);
         const prevRange = getPreviousRange(range);
 
-        const [currentReadings, previousReadings] = await Promise.all([
-          fetchReadings(deviceId as number, range),
+        // Ambil data periode saat ini untuk SEMUA device sekaligus (dipakai
+        // untuk tabel perbandingan antar lokasi), plus data periode
+        // sebelumnya khusus untuk device yang sedang dipilih (dipakai untuk
+        // delta ▲▼ di kartu statistik).
+        const [allCurrentResults, previousReadings] = await Promise.all([
+          Promise.all(
+            devices.map(async (d) => {
+              const readings = await fetchReadings(d.id, range);
+              return [d.id, computeStats(readings)] as const;
+            })
+          ),
           fetchReadings(deviceId as number, prevRange),
         ]);
 
         if (cancelled) return;
-        setCurrentStats(computeStats(currentReadings));
+
+        const statsMap: Record<number, PeriodStats> = {};
+        for (const [id, stats] of allCurrentResults) {
+          statsMap[id] = stats;
+        }
+
+        setStatsByDevice(statsMap);
+        setCurrentStats(statsMap[deviceId as number] ?? null);
         setPreviousStats(computeStats(previousReadings));
       } catch (err) {
         console.error("Gagal memuat analitik:", err);
@@ -54,6 +72,7 @@ export default function AnalyticsClient({ devices }: { devices: Device[] }) {
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deviceId, preset, customStart, customEnd]);
 
   if (devices.length === 0) {
@@ -96,6 +115,7 @@ export default function AnalyticsClient({ devices }: { devices: Device[] }) {
         <>
           <StatsSummary current={currentStats} previous={previousStats} />
           <TrendChart readings={currentStats.series} />
+          <LocationComparison devices={devices} statsByDevice={statsByDevice} />
         </>
       )}
     </div>

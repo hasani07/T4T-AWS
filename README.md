@@ -29,6 +29,10 @@ kecepatan & arah angin, curah hujan) dari 2 device AWS (`CISANGKUY`,
    mengecualikan kategori `"U"`/calm)
 ✅ Grafik tren garis untuk suhu, kelembaban, dan kecepatan angin sepanjang
    periode yang dipilih
+✅ **Perbandingan antar lokasi**: tabel yang membandingkan `CISANGKUY` vs
+   `CIMINYAK` untuk periode yang sama (bukan periode sebelumnya) — suhu,
+   kelembaban, kecepatan angin, curah hujan, dan arah angin dominan,
+   lengkap dengan kolom selisih
 ✅ **Filter sanity-check otomatis**: baris data dengan nilai di luar rentang
    wajar (lihat `lib/config.ts` → `SANITY_RANGES`) dikecualikan dari
    perhitungan statistik, dengan notifikasi berapa baris yang dikecualikan.
