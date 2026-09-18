@@ -24,3 +24,38 @@ export function formatRelativeTime(lastCreatedAt: string): string {
   const diffDay = Math.floor(diffHour / 24);
   return `${diffDay} hari lalu`;
 }
+
+function getJakartaDateStr(d: Date): string {
+  // format yyyy-mm-dd berdasarkan zona waktu Asia/Jakarta, dipakai untuk
+  // cek apakah suatu timestamp jatuh di "hari ini" (WIB), terlepas dari
+  // timezone browser si pengguna.
+  return d.toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
+}
+
+/**
+ * Format jam pasti (WIB) dari sebuah timestamp. Kalau timestamp-nya hari
+ * ini (WIB), cukup tampilkan jam-nya saja. Kalau bukan hari ini, tampilkan
+ * tanggal + jam.
+ */
+export function formatDateTime(iso: string): string {
+  const date = new Date(iso);
+  const now = new Date();
+
+  const timeStr = date.toLocaleTimeString("id-ID", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Asia/Jakarta",
+  });
+
+  const isToday = getJakartaDateStr(date) === getJakartaDateStr(now);
+  if (isToday) {
+    return `${timeStr} WIB`;
+  }
+
+  const dateStr = date.toLocaleDateString("id-ID", {
+    day: "2-digit",
+    month: "short",
+    timeZone: "Asia/Jakarta",
+  });
+  return `${dateStr}, ${timeStr} WIB`;
+}

@@ -1,6 +1,6 @@
 import { DeviceWithLatestReading } from "@/lib/types";
 import { WIND_DIRECTION_LABELS } from "@/lib/config";
-import { isDeviceOnline, formatRelativeTime } from "@/lib/deviceStatus";
+import { isDeviceOnline, formatRelativeTime, formatDateTime } from "@/lib/deviceStatus";
 import StatusBadge from "./StatusBadge";
 
 function Metric({ label, value }: { label: string; value: string }) {
@@ -43,7 +43,8 @@ export default function SensorCard({
             <Metric label="Curah Hujan" value={`${latest.rainfall.toFixed(1)} mm`} />
           </dl>
           <p className="mt-4 text-xs text-slate-400">
-            Update terakhir: {formatRelativeTime(latest.created_at)}
+            Update terakhir: {formatDateTime(latest.created_at)} ·{" "}
+            {formatRelativeTime(latest.created_at)}
           </p>
         </>
       ) : (
