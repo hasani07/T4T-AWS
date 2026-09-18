@@ -20,6 +20,12 @@ export default function Nav() {
         >
           Download
         </Link>
+        <Link
+          href="/recommendations"
+          className="text-sm text-slate-600 hover:text-slate-900"
+        >
+          Rekomendasi AI
+        </Link>
       </div>
     </nav>
   );

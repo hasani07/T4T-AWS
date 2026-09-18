@@ -124,15 +124,19 @@ Proyek ini membangun dashboard web untuk memonitor kondisi mikroklimat persemaia
 ### 5.4 Tabel Baru (Fitur, terpisah dari data existing)
 Tabel-tabel berikut **baru dibuat untuk fitur dashboard**, tidak bersinggungan dengan `devices`/`sensors`/`system_logs`.
 
-#### `ai_recommendations`
+#### `ai_recommendations` — **Diperbarui saat implementasi Fase 4**
 | Kolom | Tipe | Keterangan |
 |---|---|---|
 | id | uuid (PK) | |
+| device_id | int8 (FK → devices.id) | **Ditambahkan saat implementasi**: 1 rekomendasi dihasilkan per device (2 lokasi berperilaku independen), bukan 1 rekomendasi gabungan |
 | generated_at | timestamptz | |
 | trigger_type | text | `manual` / `scheduled` |
-| period_covered | tstzrange | Data yang dipakai sebagai input |
-| input_summary | jsonb | Snapshot data + VPD + status risiko saat generate |
+| input_summary | jsonb | Snapshot data (suhu, RH, angin, curah hujan 24 jam, VPD, klasifikasi risiko) saat generate |
 | recommendation_text | text | Output dari Groq |
+
+> Kolom `period_covered` (tstzrange) di draf awal disederhanakan — cukup direpresentasikan lewat isi `input_summary` (mis. `rainfall_24h` menandakan window 24 jam yang dipakai).
+
+**Scheduler untuk generate otomatis**: menggunakan **Vercel Cron** (bukan Supabase Edge Functions), karena frekuensinya cuma 1x/hari dan Vercel Cron plan gratis sudah mendukung ini — lebih sederhana daripada setup Supabase CLI/Edge Functions untuk kebutuhan sesederhana ini. Supabase Edge Functions + pg_cron tetap dipakai untuk Fase 6 (notifikasi backup tiap 30 menit) yang butuh frekuensi lebih tinggi dari yang didukung Vercel Cron gratis.
 
 #### `weekly_reports`
 | Kolom | Tipe | Keterangan |

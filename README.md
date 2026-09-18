@@ -38,8 +38,57 @@ kecepatan & arah angin, curah hujan) dari 2 device AWS (`CISANGKUY`,
    perhitungan statistik, dengan notifikasi berapa baris yang dikecualikan.
    Data mentahnya tetap ada di database, tidak dihapus/diubah.
 
-Belum termasuk (menyusul di fase berikutnya sesuai roadmap PRD): AI
-recommendation (Groq), laporan mingguan Telegram, backup otomatis.
+Belum termasuk (menyusul di fase berikutnya sesuai roadmap PRD): laporan
+mingguan Telegram, backup otomatis.
+
+## Lingkup Fase 4 (AI Recommendation) — halaman `/recommendations`
+
+✅ **Rule engine deterministik** (`lib/rules/ruleEngine.ts`) — hitung VPD,
+   klasifikasi risiko (aman/waspada/kritis) dari data sensor terbaru,
+   berbasis ambang batas materi Workshop T4T. Ini murni matematika/logika,
+   BUKAN dari LLM, supaya angka & klasifikasi konsisten.
+✅ **Groq** (`lib/groq.ts`) hanya menyusun narasi rekomendasi dari hasil
+   rule engine — tidak menghitung ulang angka.
+✅ **Generate manual**: tombol di halaman, langsung pakai data real-time
+   terbaru, hasil untuk 2 device sekaligus.
+✅ **Generate otomatis**: tiap pagi ±06:00 WIB lewat **Vercel Cron**
+   (`vercel.json`), pakai data 24 jam terakhir untuk konteks curah hujan.
+✅ Riwayat rekomendasi tersimpan di tabel baru `ai_recommendations` (lihat
+   `supabase/sql/001_create_ai_recommendations.sql`) — tabel ini **baru**,
+   tidak menyentuh `devices`/`sensors`/`system_logs`.
+
+### ⚠️ Setup Tambahan yang WAJIB Sebelum Fase 4 Ini Jalan
+
+1. **Jalankan SQL migrasi**: buka Supabase Dashboard → SQL Editor, copy-paste
+   isi file `supabase/sql/001_create_ai_recommendations.sql`, jalankan.
+   Ini membuat tabel baru, tidak mengubah tabel yang sudah ada.
+
+2. **Dapatkan Groq API key**: daftar/login di
+   [console.groq.com](https://console.groq.com), buat API key baru.
+
+3. **Dapatkan Supabase service_role key**: Supabase Dashboard → Project
+   Settings → API → bagian "Project API keys" → copy key **`service_role`**
+   (BUKAN yang `anon`). Key ini sangat rahasia — bisa akses penuh ke semua
+   tabel, jangan pernah ditaruh di kode frontend atau di-commit ke Git.
+
+4. **Buat CRON_SECRET**: string acak bebas untuk mengamankan endpoint cron
+   (boleh generate dari [randomkeygen.com](https://randomkeygen.com) atau
+   sejenisnya).
+
+5. **Tambahkan ke Environment Variables di Vercel** (Project Settings →
+   Environment Variables), selain 2 yang sudah ada sebelumnya:
+   - `GROQ_API_KEY`
+   - `GROQ_MODEL` (opsional, default `llama-3.3-70b-versatile` — cek model
+     yang tersedia di console Groq kalau mau ganti)
+   - `SUPABASE_SERVICE_ROLE_KEY`
+   - `CRON_SECRET`
+
+   **PENTING**: jangan beri prefix `NEXT_PUBLIC_` pada 4 variable di atas —
+   itu akan membuatnya ter-expose ke browser.
+
+6. Redeploy project di Vercel setelah environment variables ditambahkan
+   (Vercel akan otomatis mendeteksi `vercel.json` dan mendaftarkan jadwal
+   cron-nya saat deploy).
 
 ## Lingkup Fase 3 (Download Data Sensor) — halaman `/download`
 
@@ -134,5 +183,13 @@ tulis data dari device.
 
 ## Roadmap Fase Berikutnya
 
-Lihat Bagian "Rencana Mulai" di percakapan / PRD untuk detail fase 4–7:
-AI Recommendation (Groq) → Laporan Mingguan Telegram → Backup & Notifikasi.
+Lihat Bagian "Rencana Mulai" di percakapan / PRD untuk detail fase 5–6:
+Laporan Mingguan Telegram → Backup & Notifikasi.
+
+## Catatan Arsitektur: Scheduler
+
+- **Generate rekomendasi AI (1x/hari)** pakai **Vercel Cron** — cukup untuk
+  frekuensi harian dan sudah didukung di plan gratis Vercel.
+- **Notifikasi backup (Fase 6, sampai tiap 30 menit)** akan pakai
+  **Supabase Edge Functions + pg_cron** seperti rencana awal di PRD, karena
+  frekuensi setinggi itu tidak didukung Vercel Cron plan gratis.
