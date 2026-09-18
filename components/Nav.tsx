@@ -14,6 +14,12 @@ export default function Nav() {
         >
           Analitik
         </Link>
+        <Link
+          href="/download"
+          className="text-sm text-slate-600 hover:text-slate-900"
+        >
+          Download
+        </Link>
       </div>
     </nav>
   );

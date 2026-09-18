@@ -38,8 +38,20 @@ kecepatan & arah angin, curah hujan) dari 2 device AWS (`CISANGKUY`,
    perhitungan statistik, dengan notifikasi berapa baris yang dikecualikan.
    Data mentahnya tetap ada di database, tidak dihapus/diubah.
 
-Belum termasuk (menyusul di fase berikutnya sesuai roadmap PRD): download
-CSV, AI recommendation (Groq), laporan mingguan Telegram, backup otomatis.
+Belum termasuk (menyusul di fase berikutnya sesuai roadmap PRD): AI
+recommendation (Groq), laporan mingguan Telegram, backup otomatis.
+
+## Lingkup Fase 3 (Download Data Sensor) — halaman `/download`
+
+✅ Pilih device (`CISANGKUY` / `CIMINYAK` / "Semua Device" gabungan)
+✅ Filter periode: 7 hari terakhir, 1 bulan terakhir, atau custom range
+✅ Export ke **CSV** dengan kolom: `created_at, device_id, device_type,
+   temperature, humidity, wind_speed, wind_direction, rainfall`
+✅ **Pagination otomatis** — kalau data pada rentang tanggal lebih dari 1000
+   baris (batas default per-query Supabase), sistem otomatis mengambil
+   semua halaman data supaya tidak ada yang terpotong diam-diam
+✅ File CSV berisi data **mentah apa adanya** (tidak difilter sanity-check
+   seperti di halaman Analitik) — cocok untuk audit/investigasi
 
 ## ⚠️ PENTING — Prinsip Keamanan Data
 
@@ -122,6 +134,5 @@ tulis data dari device.
 
 ## Roadmap Fase Berikutnya
 
-Lihat Bagian "Rencana Mulai" di percakapan / PRD untuk detail fase 3–7:
-Download CSV → AI Recommendation (Groq) → Laporan Mingguan Telegram →
-Backup & Notifikasi.
+Lihat Bagian "Rencana Mulai" di percakapan / PRD untuk detail fase 4–7:
+AI Recommendation (Groq) → Laporan Mingguan Telegram → Backup & Notifikasi.
