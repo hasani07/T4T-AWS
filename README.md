@@ -1,4 +1,4 @@
-# AWS T4T — Dashboard Monitoring Mikroklimat (Fase 1: Fondasi)
+# AWS T4T — Dashboard Monitoring Mikroklimat (Fase 1 + Fase 2)
 
 Dashboard web untuk memonitor data sensor mikroklimat (suhu, kelembaban,
 kecepatan & arah angin, curah hujan) dari 2 device AWS (`CISANGKUY`,
@@ -7,7 +7,7 @@ kecepatan & arah angin, curah hujan) dari 2 device AWS (`CISANGKUY`,
 **Referensi lengkap fitur & keputusan desain**: lihat file PRD
 (`PRD_Dashboard_Monitoring_AWS_T4T.md`) yang menyertai project ini.
 
-## Lingkup Fase 1 Ini
+## Lingkup Fase 1 (Fondasi)
 
 ✅ Koneksi ke Supabase (read-only)
 ✅ Kartu dashboard per device: suhu, kelembaban, kecepatan angin, arah angin,
@@ -16,9 +16,26 @@ kecepatan & arah angin, curah hujan) dari 2 device AWS (`CISANGKUY`,
 ✅ Update kartu real-time (Supabase Realtime — otomatis refresh saat ada
    data baru masuk, tanpa perlu reload halaman)
 
-Belum termasuk di fase ini (menyusul di fase berikutnya sesuai roadmap PRD):
-analitik & perbandingan periode, download CSV, AI recommendation (Groq),
-laporan mingguan Telegram, backup otomatis.
+## Lingkup Fase 2 (Analitik & Perbandingan Periode) — halaman `/analytics`
+
+✅ Pilih device (`CISANGKUY` / `CIMINYAK`)
+✅ Filter periode: 7 hari terakhir, 1 bulan terakhir (rolling 30 hari), atau
+   custom range (pilih tanggal dari–sampai)
+✅ Statistik per parameter: rata-rata, min, max (suhu, kelembaban, kecepatan
+   angin), serta total curah hujan pada periode tersebut
+✅ **Perbandingan otomatis** dengan periode sebelumnya yang durasinya sama
+   (ditampilkan sebagai delta persentase ▲/▼)
+✅ Arah angin dominan (dihitung sebagai modus/frekuensi kategori kompas,
+   mengecualikan kategori `"U"`/calm)
+✅ Grafik tren garis untuk suhu, kelembaban, dan kecepatan angin sepanjang
+   periode yang dipilih
+✅ **Filter sanity-check otomatis**: baris data dengan nilai di luar rentang
+   wajar (lihat `lib/config.ts` → `SANITY_RANGES`) dikecualikan dari
+   perhitungan statistik, dengan notifikasi berapa baris yang dikecualikan.
+   Data mentahnya tetap ada di database, tidak dihapus/diubah.
+
+Belum termasuk (menyusul di fase berikutnya sesuai roadmap PRD): download
+CSV, AI recommendation (Groq), laporan mingguan Telegram, backup otomatis.
 
 ## ⚠️ PENTING — Prinsip Keamanan Data
 
@@ -101,6 +118,6 @@ tulis data dari device.
 
 ## Roadmap Fase Berikutnya
 
-Lihat Bagian "Rencana Mulai" di percakapan / PRD untuk detail fase 2–7:
-Analitik & Perbandingan Periode → Download CSV → AI Recommendation (Groq)
-→ Laporan Mingguan Telegram → Backup & Notifikasi.
+Lihat Bagian "Rencana Mulai" di percakapan / PRD untuk detail fase 3–7:
+Download CSV → AI Recommendation (Groq) → Laporan Mingguan Telegram →
+Backup & Notifikasi.
