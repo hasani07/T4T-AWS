@@ -1,5 +1,5 @@
 import { supabase } from "./supabase";
-import { supabaseServer } from "./supabaseServer";
+import { getSupabaseServer } from "./supabaseServer";
 import { Device, SensorReading } from "./types";
 import { runRuleEngine } from "./rules/ruleEngine";
 import { generateRecommendationText } from "./groq";
@@ -85,7 +85,7 @@ export async function runGenerateRecommendations(
       rainfallNote: ruleOutput.rainfallNote,
     });
 
-    const { error: insertError } = await supabaseServer
+    const { error: insertError } = await getSupabaseServer()
       .from("ai_recommendations")
       .insert({
         device_id: device.id,
