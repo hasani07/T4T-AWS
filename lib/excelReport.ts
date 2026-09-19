@@ -218,8 +218,9 @@ export async function buildExcelReport(params: {
   });
 
   if (chartImageBuffer) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const imageId = workbook.addImage({
-      buffer: chartImageBuffer as unknown as Buffer,
+      buffer: chartImageBuffer as any,
       extension: "png",
     });
     const chartRowStart = 4 + stats.length + 2;
