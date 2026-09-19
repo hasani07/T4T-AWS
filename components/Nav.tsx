@@ -63,7 +63,7 @@ export default function Nav() {
           })}
         </nav>
 
-        
+        <a
           href={TELEGRAM_CHANNEL_URL}
           target="_blank"
           rel="noopener noreferrer"

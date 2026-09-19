@@ -30,7 +30,7 @@ export default function TelegramJoinCard() {
           </p>
         </div>
       </div>
-      
+      <a
         href={TELEGRAM_CHANNEL_URL}
         target="_blank"
         rel="noopener noreferrer"
