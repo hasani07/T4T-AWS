@@ -136,7 +136,7 @@ Tabel-tabel berikut **baru dibuat untuk fitur dashboard**, tidak bersinggungan d
 
 > Kolom `period_covered` (tstzrange) di draf awal disederhanakan — cukup direpresentasikan lewat isi `input_summary` (mis. `rainfall_24h` menandakan window 24 jam yang dipakai).
 
-**Scheduler untuk generate otomatis**: menggunakan **Vercel Cron** (bukan Supabase Edge Functions), karena frekuensinya cuma 1x/hari dan Vercel Cron plan gratis sudah mendukung ini — lebih sederhana daripada setup Supabase CLI/Edge Functions untuk kebutuhan sesederhana ini. Supabase Edge Functions + pg_cron tetap dipakai untuk Fase 6 (notifikasi backup tiap 30 menit) yang butuh frekuensi lebih tinggi dari yang didukung Vercel Cron gratis.
+**Scheduler untuk generate otomatis**: menggunakan **Supabase Edge Functions + pg_cron** — sesuai rencana awal (Bagian 3). Sempat dicoba pakai Vercel Cron di awal implementasi Fase 4 (karena kebutuhannya cuma 1x/hari, lebih sederhana setup-nya), tapi akhirnya dipindahkan ke Supabase supaya konsisten dengan Fase 6 (notifikasi backup) yang memang wajib pakai Supabase Edge Functions, dan supaya presisi jadwal lebih baik (Vercel Hobby cuma menjamin eksekusi "dalam 1 jam", bukan presisi menit).
 
 #### `weekly_reports`
 | Kolom | Tipe | Keterangan |
@@ -235,7 +235,7 @@ Kelas VPD: **< 0.8 kPa** = rendah (lembap, transpirasi rendah) · **0.8–1.5 kP
 4. Groq mengembalikan rekomendasi tindakan dalam bahasa natural (actionable), disimpan ke tabel `ai_recommendations`.
 
 ### 9.3 Trigger
-- **Manual**: tombol "Generate Rekomendasi" di dashboard, kapan saja, pakai data real-time terbaru.
+- **Manual**: tombol "Generate Rekomendasi" di dashboard, kapan saja, pakai data real-time terbaru — bisa di-generate berkali-kali tanpa batasan.
 - **Otomatis (terjadwal)**: setiap **pagi ±06:00 WIB**, menggunakan data 24 jam terakhir — dipilih pagi supaya rekomendasi bisa langsung dieksekusi di hari yang sama (siram, pasang naungan, dsb).
 
 ### 9.4 Penanganan Kondisi "Calm" (Tidak Ada Angin)

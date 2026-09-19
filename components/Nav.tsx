@@ -26,6 +26,12 @@ export default function Nav() {
         >
           Rekomendasi AI
         </Link>
+        <Link
+          href="/reports"
+          className="text-sm text-slate-600 hover:text-slate-900"
+        >
+          Laporan Mingguan
+        </Link>
       </div>
     </nav>
   );

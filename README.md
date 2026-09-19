@@ -90,6 +90,53 @@ mingguan Telegram, backup otomatis.
    (Vercel akan otomatis mendeteksi `vercel.json` dan mendaftarkan jadwal
    cron-nya saat deploy).
 
+## Lingkup Fase 5 (Laporan Mingguan Telegram) — halaman `/reports`
+
+✅ Isi laporan: **teks ringkasan** (suhu, kelembaban, angin, curah hujan,
+   arah angin dominan, delta vs periode sebelumnya) + **grafik** (tren
+   suhu harian, dibuat via QuickChart.io) + **rekomendasi AI terakhir**
+   per device.
+✅ Dikirim ke **1 channel Telegram** (foto grafik dulu, lalu pesan teks
+   detail terpisah karena caption foto Telegram terbatas panjangnya).
+✅ **Generate manual**: tombol di halaman, langsung generate & kirim.
+✅ **Generate otomatis**: dicek setiap pagi (via Vercel Cron, 5 menit
+   setelah cron AI Recommendation), tapi baru benar-benar mengirim kalau
+   sudah lewat interval yang dikonfigurasi sejak laporan terakhir —
+   **interval bisa diatur dari dashboard** (disimpan di tabel `settings`,
+   default 7 hari) tanpa perlu ubah jadwal cron.
+✅ Riwayat laporan (`weekly_reports`) — tabel baru, tidak menyentuh yang
+   sudah ada.
+
+### ⚠️ Setup Tambahan untuk Fase 5
+
+1. **Jalankan SQL migrasi kedua**: `supabase/sql/002_create_weekly_reports.sql`
+   di Supabase SQL Editor (bikin tabel `settings` & `weekly_reports`).
+
+2. **Buat Bot Telegram**:
+   - Chat ke [@BotFather](https://t.me/BotFather) di Telegram
+   - Kirim `/newbot`, ikuti instruksinya (kasih nama & username bot)
+   - Simpan **token** yang diberikan (formatnya seperti
+     `123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ`)
+
+3. **Buat/siapkan channel Telegram**, lalu **tambahkan bot tadi sebagai
+   admin** channel itu (Settings channel → Administrators → Add Admin →
+   cari username bot Anda).
+
+4. **Dapatkan Chat ID channel**:
+   - Kirim 1 pesan apa saja ke channel-nya dulu
+   - Buka di browser:
+     `https://api.telegram.org/bot<TOKEN_BOT_ANDA>/getUpdates`
+     (ganti `<TOKEN_BOT_ANDA>` dengan token dari langkah 2)
+   - Cari bagian `"chat":{"id":-100xxxxxxxxxx, ...}` di hasil JSON-nya —
+     angka itu (termasuk tanda minusnya) adalah Chat ID Anda
+
+5. **Tambahkan ke Environment Variables Vercel**:
+   - `TELEGRAM_BOT_TOKEN`
+   - `TELEGRAM_CHAT_ID`
+
+6. Redeploy, lalu coba klik "Generate & Kirim Sekarang" di halaman
+   `/reports` — cek apakah pesannya muncul di channel Telegram Anda.
+
 ## Lingkup Fase 3 (Download Data Sensor) — halaman `/download`
 
 ✅ Pilih device (`CISANGKUY` / `CIMINYAK` / "Semua Device" gabungan)
@@ -183,16 +230,80 @@ tulis data dari device.
 
 ## Roadmap Fase Berikutnya
 
-Lihat Bagian "Rencana Mulai" di percakapan / PRD untuk detail fase 5–6:
-Laporan Mingguan Telegram → Backup & Notifikasi.
+Lihat Bagian "Rencana Mulai" di percakapan / PRD untuk detail fase 6:
+Backup & Notifikasi.
 
 ## Catatan Arsitektur: Scheduler
 
-- **Generate rekomendasi AI (1x/hari)** pakai **Vercel Cron** — cukup untuk
-  frekuensi harian dan sudah didukung di plan gratis Vercel.
-- **Notifikasi backup (Fase 6, sampai tiap 30 menit)** akan pakai
-  **Supabase Edge Functions + pg_cron** seperti rencana awal di PRD, karena
-  frekuensi setinggi itu tidak didukung Vercel Cron plan gratis.
+**Update**: Semua cron job (AI Recommendation & Laporan Mingguan) sudah
+**dipindahkan ke Supabase Edge Functions + pg_cron**, bukan lagi Vercel
+Cron. Lihat bagian "Migrasi Scheduler ke Supabase" di bawah.
+
+Endpoint `/api/cron/generate-recommendation` dan `/api/cron/weekly-report`
+di Next.js **masih ada** di kode (tidak dihapus, tidak berbahaya kalau
+dibiarkan — dilindungi `CRON_SECRET`), tapi **tidak lagi dipanggil
+otomatis** karena `vercel.json` sudah tidak punya konfigurasi cron.
+Tombol **manual** ("Generate Rekomendasi Sekarang", "Generate & Kirim
+Sekarang") tetap jalan seperti biasa lewat Next.js/Vercel — yang pindah
+cuma bagian **terjadwal/otomatisnya**.
+
+## Migrasi Scheduler ke Supabase Edge Functions + pg_cron
+
+### Kenapa Pindah
+- Presisi jadwal lebih baik (tidak "kira-kira dalam 1 jam" seperti Vercel
+  Hobby)
+- Tidak dibatasi 1x/hari kalau nanti butuh frekuensi lebih tinggi
+- Konsisten dengan Fase 6 (Backup & Notifikasi) yang memang harus pakai
+  infrastruktur ini
+
+### File yang Terlibat
+- `supabase/functions/generate-recommendation/index.ts` — versi Deno dari
+  logic AI Recommendation
+- `supabase/functions/weekly-report/index.ts` — versi Deno dari logic
+  Laporan Mingguan
+- `supabase/sql/003_setup_pg_cron.sql` — SQL untuk menjadwalkan keduanya
+
+### Langkah Deploy (Semua Lewat Browser, TIDAK Perlu Install CLI/Docker)
+
+1. **Buka Supabase Dashboard → Edge Functions** (menu di sidebar kiri).
+2. Klik **"Deploy a new function"** → pilih **"Via Editor"**.
+3. Beri nama function: **`generate-recommendation`** (harus persis ini).
+4. Hapus kode template bawaan, **paste seluruh isi**
+   `supabase/functions/generate-recommendation/index.ts` dari project ini.
+5. Klik **Deploy**.
+6. Ulangi langkah 2-5 untuk function kedua, nama: **`weekly-report`**,
+   isinya dari `supabase/functions/weekly-report/index.ts`.
+
+### Set Secrets untuk Edge Functions
+
+Masuk ke **Project Settings → Edge Functions → Secrets** (atau menu
+serupa tergantung versi dashboard), tambahkan:
+- `GROQ_API_KEY`
+- `GROQ_MODEL` (opsional, default `openai/gpt-oss-120b`)
+- `TELEGRAM_BOT_TOKEN`
+- `TELEGRAM_CHAT_ID`
+
+*(`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` OTOMATIS
+tersedia di semua Edge Function — tidak perlu diisi manual.)*
+
+### Jadwalkan dengan pg_cron
+
+1. Buka **Supabase SQL Editor**.
+2. Buka file `supabase/sql/003_setup_pg_cron.sql`, **ganti**
+   `<PROJECT_REF>` dan `<SERVICE_ROLE_KEY>` dengan punya Anda (project
+   ref terlihat di URL dashboard atau Project Settings → General).
+3. Jalankan SQL-nya.
+4. Cek jadwal aktif: `select * from cron.job;`
+
+### Tes Manual (Sebelum Menunggu Jadwal)
+
+Bisa test langsung dari SQL Editor atau browser dengan memanggil URL
+function-nya pakai service_role key sebagai Bearer token (pakai tool
+seperti Postman, atau `curl` kalau familiar terminal) — atau paling
+gampang, tunggu jadwalnya jalan besok pagi, lalu cek:
+```sql
+select * from cron.job_run_details order by start_time desc limit 10;
+```
 
 ## ⚠️ Catatan Penting: Bug Timestamp di Sumber Data
 
