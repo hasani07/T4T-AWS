@@ -78,7 +78,7 @@ mingguan Telegram, backup otomatis.
 5. **Tambahkan ke Environment Variables di Vercel** (Project Settings →
    Environment Variables), selain 2 yang sudah ada sebelumnya:
    - `GROQ_API_KEY`
-   - `GROQ_MODEL` (opsional, default `llama-3.3-70b-versatile` — cek model
+   - `GROQ_MODEL` (opsional, default `openai/gpt-oss-120b` — cek model
      yang tersedia di console Groq kalau mau ganti)
    - `SUPABASE_SERVICE_ROLE_KEY`
    - `CRON_SECRET`
@@ -193,3 +193,28 @@ Laporan Mingguan Telegram → Backup & Notifikasi.
 - **Notifikasi backup (Fase 6, sampai tiap 30 menit)** akan pakai
   **Supabase Edge Functions + pg_cron** seperti rencana awal di PRD, karena
   frekuensi setinggi itu tidak didukung Vercel Cron plan gratis.
+
+## ⚠️ Catatan Penting: Bug Timestamp di Sumber Data
+
+Ditemukan bahwa kolom `sensors.created_at` diberi label UTC (`+00`) oleh
+Supabase, **padahal angka jam yang tersimpan sebenarnya sudah WIB**
+(device/pipeline pengirim data salah label — bukan benar-benar UTC). Ini
+bug di sisi sumber data, di luar kendali dashboard, dan **tidak diubah**
+(sesuai prinsip non-destructive) — kompensasinya dilakukan di sisi
+dashboard:
+
+- `lib/deviceStatus.ts` — jam ditampilkan apa adanya (tidak dikonversi
+  timezone lagi), dan perhitungan online/offline & "X menit lalu"
+  dikonversi balik dengan MENGURANGI 7 jam untuk dapat instant UTC yang
+  benar.
+- `lib/sensorTimeOffset.ts` — helper baru untuk menggeser rentang tanggal
+  query (dipakai di Analitik, Download CSV, dan window 24 jam AI
+  Recommendation) supaya cocok dengan cara data tersimpan.
+- `components/analytics/TrendChart.tsx` — label sumbu waktu grafik ambil
+  angka jam langsung dari data, tanpa `toLocaleString` yang bisa
+  menggandakan konversi.
+
+**Catatan ini HANYA berlaku untuk tabel `sensors`** (asalnya dari device).
+Timestamp yang dibuat sendiri oleh server kita (`ai_recommendations`,
+nanti `weekly_reports`/`backup_logs`) tidak kena masalah ini, karena
+berasal dari jam server Vercel/Postgres yang benar.

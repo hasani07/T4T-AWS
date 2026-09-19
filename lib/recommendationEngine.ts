@@ -3,6 +3,7 @@ import { getSupabaseServer } from "./supabaseServer";
 import { Device, SensorReading } from "./types";
 import { runRuleEngine } from "./rules/ruleEngine";
 import { generateRecommendationText } from "./groq";
+import { toSensorQueryBoundary } from "./sensorTimeOffset";
 
 export interface GeneratedRecommendation {
   deviceId: number;
@@ -35,7 +36,7 @@ async function getLatestReading(deviceId: number): Promise<SensorReading | null>
 }
 
 async function getRainfallSum24h(deviceId: number): Promise<number> {
-  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const since = toSensorQueryBoundary(new Date(Date.now() - 24 * 60 * 60 * 1000));
   const { data, error } = await supabase
     .from("sensors")
     .select("rainfall")

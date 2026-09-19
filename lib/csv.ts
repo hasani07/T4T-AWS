@@ -1,6 +1,7 @@
 import { supabase } from "./supabase";
 import { SensorReading } from "./types";
 import { DateRange } from "./dateRange";
+import { toSensorQueryBoundary } from "./sensorTimeOffset";
 
 const PAGE_SIZE = 1000; // batas default Supabase per query
 
@@ -23,8 +24,8 @@ export async function fetchAllReadingsInRange(
       .from("sensors")
       .select("*")
       .in("device_id", deviceIds)
-      .gte("created_at", range.start.toISOString())
-      .lt("created_at", range.end.toISOString())
+      .gte("created_at", toSensorQueryBoundary(range.start))
+      .lt("created_at", toSensorQueryBoundary(range.end))
       .order("created_at", { ascending: true })
       .range(from, to);
 

@@ -14,6 +14,27 @@ import {
 } from "recharts";
 import { SensorReading } from "@/lib/types";
 
+// ⚠️ Sama seperti di lib/deviceStatus.ts: timestamp sensor diberi label
+// "+00" (UTC) padahal angkanya sudah WIB. Untuk label sumbu waktu di
+// grafik, angkanya diambil langsung apa adanya (tanpa toLocaleString yang
+// bisa nge-double-convert timezone), bukan lewat parsing otomatis.
+const MONTH_LABELS = [
+  "Jan", "Feb", "Mar", "Apr", "Mei", "Jun",
+  "Jul", "Agu", "Sep", "Okt", "Nov", "Des",
+];
+
+function formatSensorTimeLabel(iso: string): string {
+  const naive = iso.slice(0, 19); // "YYYY-MM-DDTHH:mm:ss"
+  const [datePart, timePart] = naive.split("T");
+  const [, month, day] = datePart.split("-").map(Number);
+  const [hour, minute] = timePart.split(":").map(Number);
+
+  const dd = String(day).padStart(2, "0");
+  const hh = String(hour).padStart(2, "0");
+  const mm = String(minute).padStart(2, "0");
+  return `${dd} ${MONTH_LABELS[month - 1]} ${hh}:${mm}`;
+}
+
 type MetricKey = "Suhu" | "Kelembaban" | "Kec. Angin" | "Curah Hujan";
 
 const METRICS: { key: MetricKey; color: string; type: "line" | "bar" }[] = [
@@ -46,12 +67,7 @@ export default function TrendChart({ readings }: { readings: SensorReading[] }) 
   }
 
   const data = readings.map((r) => ({
-    time: new Date(r.created_at).toLocaleString("id-ID", {
-      day: "2-digit",
-      month: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-    }),
+    time: formatSensorTimeLabel(r.created_at),
     Suhu: r.temperature,
     Kelembaban: r.humidity,
     "Kec. Angin": r.wind_speed,

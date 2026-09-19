@@ -2,6 +2,7 @@ import { supabase } from "./supabase";
 import { SensorReading } from "./types";
 import { CALM_WIND_CODE, SANITY_RANGES } from "./config";
 import { DateRange } from "./dateRange";
+import { toSensorQueryBoundary } from "./sensorTimeOffset";
 
 export interface PeriodStats {
   totalReadings: number;
@@ -33,8 +34,8 @@ export async function fetchReadings(
     .from("sensors")
     .select("*")
     .eq("device_id", deviceId)
-    .gte("created_at", range.start.toISOString())
-    .lt("created_at", range.end.toISOString())
+    .gte("created_at", toSensorQueryBoundary(range.start))
+    .lt("created_at", toSensorQueryBoundary(range.end))
     .order("created_at", { ascending: true })
     .limit(5000);
 
