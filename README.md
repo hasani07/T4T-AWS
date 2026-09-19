@@ -230,8 +230,59 @@ tulis data dari device.
 
 ## Roadmap Fase Berikutnya
 
-Lihat Bagian "Rencana Mulai" di percakapan / PRD untuk detail fase 6:
-Backup & Notifikasi.
+Semua 6 fase dari PRD sudah selesai diimplementasikan. 🎉
+
+## Lingkup Fase 6 (Backup Otomatis & Notifikasi) — halaman `/backups`
+
+✅ **Backup otomatis**: dicek tiap 15 menit (Supabase Edge Function +
+   pg_cron), trigger saat kapasitas database >= 50% dari kuota yang
+   dikonfigurasi.
+✅ Backup berupa **export data seluruh tabel ke JSON** (bukan pg_dump
+   fisik — Edge Function tidak bisa jalankan pg_dump), disimpan di
+   Supabase Storage bucket `backups` (private).
+✅ **Retensi 60 hari** — otomatis dihapus dari Storage kalau lewat batas
+   itu dan belum pernah didownload.
+✅ **Notifikasi Telegram bertingkat**:
+   - Normal: 1x/24 jam
+   - H-1 (sisa ≤24 jam sebelum terhapus): tiap 30 menit
+   - Berhenti total begitu backup didownload lewat dashboard
+✅ Halaman `/backups`: lihat kapasitas real-time, atur kuota (MB), daftar
+   backup dengan tombol download (generate signed URL + tandai
+   `downloaded` otomatis saat diklik).
+
+### ⚠️ Setup Tambahan untuk Fase 6
+
+1. **Jalankan SQL migrasi**: `supabase/sql/004_create_backup_system.sql`
+   di Supabase SQL Editor. Ini membuat tabel `backup_logs`, function
+   `get_database_size_mb()`, dan default kuota 500 MB di `settings`.
+
+2. **Buat Storage bucket manual**: Supabase Dashboard → Storage → **New
+   bucket** → nama **`backups`** → **Private** (jangan dicentang Public).
+
+3. **Sesuaikan kuota database**: buka halaman `/backups` di dashboard
+   Anda, cek plan Supabase yang sedang dipakai (Dashboard → Settings →
+   Usage → lihat batas "Database size"), lalu update angka kuota (MB) di
+   halaman itu kalau beda dari default 500 MB.
+
+4. **Deploy Edge Function `backup-monitor`**: Supabase Dashboard → Edge
+   Functions → Deploy a new function → Via Editor → nama persis
+   `backup-monitor` → paste isi `supabase/functions/backup-monitor/index.ts`
+   → Deploy. **Tidak perlu secrets baru** — `TELEGRAM_BOT_TOKEN` dan
+   `TELEGRAM_CHAT_ID` dari Fase 5 dipakai lagi di sini.
+
+5. **Jadwalkan lewat pg_cron**: buka `supabase/sql/005_setup_backup_cron.sql`,
+   ganti `<PROJECT_REF>` dan `<SERVICE_ROLE_KEY>`, jalankan di SQL Editor.
+
+6. Verifikasi: `select * from cron.job;` harus menampilkan 3 jadwal
+   sekarang (generate-recommendation, weekly-report, backup-monitor).
+
+### Catatan Jujur soal Keterbatasan
+
+- Backup ini **export data**, bukan backup database fisik lengkap
+  (schema, index, RLS policy tidak ikut ter-backup — itu bisa direplikasi
+  ulang dari file SQL migrasi di `supabase/sql/` kalau perlu restore total).
+- Kuota database **tidak otomatis terdeteksi** dari plan Supabase Anda —
+  harus diisi manual dan disesuaikan sendiri kalau upgrade/downgrade plan.
 
 ## Catatan Arsitektur: Scheduler
 

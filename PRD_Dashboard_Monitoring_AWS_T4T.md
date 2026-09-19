@@ -255,16 +255,17 @@ Kelas VPD: **< 0.8 kPa** = rendah (lembap, transpirasi rendah) · **0.8–1.5 kP
 
 ---
 
-## 11. Fitur — Backup Otomatis & Notifikasi Telegram
+## 11. Fitur — Backup Otomatis & Notifikasi Telegram — **Diperbarui saat implementasi**
 
-- **Trigger backup**: otomatis saat kapasitas database mencapai **50%** dari kuota → snapshot disimpan ke Supabase Storage, dicatat di `backup_logs`.
-  - **Cara cek kapasitas**: dihitung dinamis terhadap limit plan Supabase yang aktif saat itu (query ukuran database aktual vs. limit project), bukan angka hardcoded — supaya kalau plan/kuota berubah di kemudian hari, logic tidak perlu diubah manual.
-- **Retensi**: file backup disimpan **60 hari**.
+- **Trigger backup**: otomatis saat kapasitas database mencapai **50%** dari kuota → data diexport ke JSON, disimpan ke Supabase Storage bucket `backups` (private), dicatat di `backup_logs`.
+- **Sifat backup — diklarifikasi saat implementasi**: karena Supabase Edge Function tidak bisa menjalankan `pg_dump` (butuh koneksi database langsung), backup berbentuk **export data seluruh tabel ke satu file JSON** (`devices`, `sensors`, `system_logs`, `ai_recommendations`, `weekly_reports`, `settings`) — bukan backup fisik database lengkap dengan schema/index/RLS policy. Cukup untuk memastikan data tidak hilang dan bisa dibaca ulang; restore schema lengkap tetap mengandalkan file SQL migrasi di `supabase/sql/`.
+- **Cara cek kapasitas — disederhanakan saat implementasi**: Supabase tidak menyediakan API untuk membaca kuota plan secara otomatis dari dalam database. Solusinya: ukuran database aktual dihitung real-time lewat SQL function `get_database_size_mb()` (akurat), sementara **angka kuota/batas diisi manual** oleh user di `settings.db_quota_mb` (default 500 MB, sesuai batas plan Free saat ini) — bisa disesuaikan sendiri dari dashboard kalau upgrade plan.
+- **Retensi**: file backup disimpan **60 hari**, dihapus otomatis dari Storage kalau lewat batas itu dan belum pernah didownload.
 - **Notifikasi (via Telegram, bukan in-app):**
   - Kondisi normal (hari 1–59 sejak backup dibuat): minimal **1x/hari** reminder untuk download.
-  - **H-1** menjelang batas 60 hari: frekuensi naik jadi **setiap 30 menit**.
-  - Begitu `backup_logs.downloaded = true` (user klik download di dashboard) → seluruh notifikasi untuk file tersebut **berhenti**.
-- Dijalankan via Supabase Edge Function + `pg_cron` (cek tiap interval pendek, mis. tiap 15–30 menit, untuk evaluasi kondisi H-1).
+  - **H-1** menjelang batas 60 hari (sisa ≤24 jam): frekuensi naik jadi **setiap 30 menit**.
+  - Begitu `backup_logs.downloaded = true` (user klik download di dashboard, lewat signed URL dari Storage) → seluruh notifikasi untuk file tersebut **berhenti**.
+- Dijalankan via Supabase Edge Function `backup-monitor` + `pg_cron`, **tiap 15 menit** — ini yang tidak bisa dilakukan Vercel Cron plan gratis (maks 1x/hari), jadi wajib di Supabase.
 
 ---
 
@@ -308,11 +309,12 @@ Tidak ada lagi item blocking untuk mulai development.
 | AI Engine | Groq, dengan knowledge base dari materi Workshop T4T + curah hujan sebagai konteks tambahan |
 | Generate rekomendasi otomatis | Pagi (±06:00) |
 | Laporan mingguan | Teks + grafik (QuickChart.io) + rekomendasi AI, 1 channel Telegram, interval dapat diatur |
-| Notifikasi backup | Telegram saja, normal 1x/hari → H-1 tiap 30 menit → stop setelah download; kapasitas dihitung dinamis dari limit plan aktif |
-| Scheduler | Supabase Edge Functions + pg_cron (bukan Vercel Cron) |
+| Notifikasi backup | Telegram saja, normal 1x/hari → H-1 tiap 30 menit → stop setelah download; kapasitas real database dihitung dinamis, kuota/batas diisi manual di `settings.db_quota_mb` |
+| Sifat backup | Export data ke JSON (bukan pg_dump fisik), tersimpan di Storage bucket `backups` (private), retensi 60 hari |
+| Scheduler | Supabase Edge Functions + pg_cron (dipakai untuk generate-recommendation, weekly-report, dan backup-monitor — ketiganya) |
 | Repo & hosting | GitHub (nama: AWS T4T) + Vercel |
 | Framework | Bebas (rekomendasi: Next.js) |
 | Sumber data sensor | **Tidak diubah** — tabel `devices`, `sensors`, `system_logs` yang sudah berjalan bersifat read-only; sistem hanya konsumsi data apa adanya |
 | Out of scope v1 | Device health monitoring dari `system_logs` (heap/reset_reason) |
 
-**PRD status: FINAL — siap masuk fase development.**
+**PRD status: SEMUA 6 FASE SELESAI DIIMPLEMENTASIKAN.** 🎉
