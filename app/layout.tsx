@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Nav from "@/components/Nav";
+import { NavigationProgressProvider } from "@/components/NavigationProgress";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -23,8 +24,10 @@ export default function RootLayout({
         />
       </head>
       <body>
-        <Nav />
-        {children}
+        <NavigationProgressProvider>
+          <Nav />
+          {children}
+        </NavigationProgressProvider>
       </body>
     </html>
   );

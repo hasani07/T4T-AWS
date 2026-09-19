@@ -1,8 +1,7 @@
 "use client";
 
 import { Fragment } from "react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import {
   LayoutGrid,
   BarChart3,
@@ -12,6 +11,7 @@ import {
   DatabaseBackup,
   CloudSun,
 } from "lucide-react";
+import { useNavigationProgress } from "./NavigationProgress";
 
 const NAV_ITEMS = [
   { href: "/", label: "Dashboard", icon: LayoutGrid },
@@ -35,6 +35,13 @@ function TelegramIcon({ size = 19 }: { size?: number }) {
 
 export default function Nav() {
   const pathname = usePathname();
+  const router = useRouter();
+  const { run } = useNavigationProgress();
+
+  function goTo(href: string) {
+    if (href === pathname) return;
+    run(() => router.push(href));
+  }
 
   return (
     <Fragment>
@@ -47,9 +54,9 @@ export default function Nav() {
             const active = pathname === item.href;
             const Icon = item.icon;
             return (
-              <Link
+              <button
                 key={item.href}
-                href={item.href}
+                onClick={() => goTo(item.href)}
                 title={item.label}
                 className={`group flex h-12 w-12 flex-col items-center justify-center gap-0.5 rounded-2xl transition ${
                   active
@@ -58,7 +65,7 @@ export default function Nav() {
                 }`}
               >
                 <Icon size={19} strokeWidth={2} />
-              </Link>
+              </button>
             );
           })}
         </nav>
@@ -82,16 +89,16 @@ export default function Nav() {
           const active = pathname === item.href;
           const Icon = item.icon;
           return (
-            <Link
+            <button
               key={item.href}
-              href={item.href}
+              onClick={() => goTo(item.href)}
               className={`flex flex-col items-center gap-0.5 rounded-2xl px-2.5 py-1.5 text-[10px] font-medium transition ${
                 active ? "bg-slate-900 text-white" : "text-slate-400"
               }`}
             >
               <Icon size={17} strokeWidth={2} />
               {item.label}
-            </Link>
+            </button>
           );
         })}
       </nav>
