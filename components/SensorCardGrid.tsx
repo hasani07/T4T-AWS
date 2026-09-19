@@ -12,6 +12,19 @@ export default function SensorCardGrid({
 }) {
   const [devices, setDevices] = useState<DeviceWithLatestReading[]>(initialData);
 
+  // "Update terakhir" (relatif & jam) dihitung dari Date.now() saat render.
+  // Tanpa ini, teksnya akan NYANGKUT di nilai saat halaman pertama dimuat
+  // dan tidak pernah berubah lagi selama tidak ada data baru masuk —
+  // makanya perlu dipaksa re-render berkala biar teksnya selalu akurat
+  // mengikuti waktu saat ini, bukan cuma waktu pertama kali dibuka.
+  const [, forceRerender] = useState(0);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      forceRerender((n) => n + 1);
+    }, 30_000); // setiap 30 detik
+    return () => clearInterval(interval);
+  }, []);
+
   useEffect(() => {
     // Subscribe ke INSERT baru di tabel `sensors` — hanya mendengarkan
     // (read), tidak pernah menulis apapun ke database.
