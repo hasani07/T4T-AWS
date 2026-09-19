@@ -33,7 +33,12 @@ export default function ReportHistory({ rows }: { rows: HistoryRow[] }) {
               </span>
             </div>
             <span className="text-xs text-slate-400">
-              {row.trigger_type === "manual" ? "Manual" : "Otomatis"} ·{" "}
+              {row.trigger_type === "manual"
+                ? "Manual"
+                : row.trigger_type === "chat"
+                ? "Via Chat Telegram"
+                : "Otomatis"}{" "}
+              ·{" "}
               {new Date(row.generated_at).toLocaleString("id-ID", {
                 timeZone: "Asia/Jakarta",
                 day: "2-digit",

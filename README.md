@@ -149,6 +149,80 @@ mingguan Telegram, backup otomatis.
 ✅ File CSV berisi data **mentah apa adanya** (tidak difilter sanity-check
    seperti di halaman Analitik) — cocok untuk audit/investigasi
 
+## Fitur Tambahan (di luar PRD awal): Laporan Excel dengan Grafik
+
+Ditambahkan berdasarkan masukan pengguna — halaman `/download` sekarang
+juga punya **Export ke Excel** yang menghasilkan file `.xlsx` berisi:
+- Tabel ringkasan (min/max/rata-rata suhu & kelembaban, rata-rata
+  kecepatan angin, total curah hujan) per periode
+- **Grafik tren suhu tertanam langsung di dalam file Excel-nya** (bukan
+  cuma link/gambar terpisah)
+
+3 pilihan granularitas:
+- **Harian (per Jam)** — pilih 1 tanggal, breakdown per jam
+- **Mingguan (per Hari)** — 7 hari terakhir, breakdown per hari
+- **Bulanan (per Hari)** — 30 hari terakhir, breakdown per hari
+
+Dibangun pakai library `exceljs` (server-side, di API route
+`/api/reports/export-excel`) dan QuickChart.io untuk render gambar
+grafiknya (sama seperti yang dipakai di Laporan Mingguan Telegram).
+
+## Fitur Tambahan: Generate Laporan Lewat Command Chat Telegram
+
+Selain generate dari dashboard, sekarang bisa juga minta laporan langsung
+dari Telegram dengan mengetik command:
+- `/laporan` — 7 hari terakhir (default)
+- `/laporan minggu` — 7 hari terakhir
+- `/laporan bulan` — 30 hari terakhir
+- `/laporan 14` — 14 hari terakhir (bisa ganti angka lain)
+- `/laporan 2026-09-01 2026-09-19` — custom range tanggal (format YYYY-MM-DD)
+
+Balasannya dikirim ke **chat yang sama** tempat command diketik (channel,
+grup, atau chat pribadi ke bot).
+
+**⚠️ Batasan Telegram (bukan dari kode ini)**: kalau dipakai di
+**Channel** (bukan Grup), **hanya admin channel** yang bisa mengirim
+pesan/command sama sekali — itu memang cara kerja Channel di Telegram.
+Subscriber biasa tidak akan punya kotak ketik. Kalau mau semua orang bisa
+pakai command ini bebas, gunakan **Grup** Telegram, bukan Channel (laporan
+otomatis terjadwal tetap bisa dikirim ke Channel seperti biasa).
+
+### Setup Tambahan
+
+1. **Jalankan migrasi**: `supabase/sql/006_allow_chat_trigger.sql` (izinkan
+   nilai `trigger_type = 'chat'` di tabel `weekly_reports`, tabel milik
+   kita sendiri jadi aman diubah).
+
+2. **Buat `TELEGRAM_WEBHOOK_SECRET`**: string acak bebas, mis. dari
+   `openssl rand -hex 24`.
+
+3. **Deploy Edge Function `telegram-webhook`**: Supabase Dashboard → Edge
+   Functions → Deploy a new function → Via Editor → nama persis
+   `telegram-webhook` → paste isi
+   `supabase/functions/telegram-webhook/index.ts` → Deploy.
+
+4. **PENTING — matikan verifikasi JWT untuk function ini**: cari
+   pengaturan function `telegram-webhook` (biasanya toggle "Enforce JWT
+   Verification" / "Verify JWT" di halaman detail function), **matikan**.
+   Telegram tidak bisa mengirim token autentikasi Supabase kita, jadi kalau
+   verifikasi JWT masih aktif, semua request dari Telegram akan ditolak
+   duluan sebelum sampai ke kode kita. Keamanannya digantikan oleh
+   pengecekan `TELEGRAM_WEBHOOK_SECRET` di dalam kode function-nya sendiri.
+
+5. **Tambahkan secret** `TELEGRAM_WEBHOOK_SECRET` di Edge Function
+   Secrets (selain `TELEGRAM_BOT_TOKEN` yang sudah ada dari Fase 5).
+
+6. **Daftarkan webhook ke Telegram** — buka URL ini di browser (ganti
+   placeholder-nya):
+   ```
+   https://api.telegram.org/bot<TOKEN_BOT_ANDA>/setWebhook?url=https://<PROJECT_REF>.supabase.co/functions/v1/telegram-webhook&secret_token=<TELEGRAM_WEBHOOK_SECRET>
+   ```
+   Harus muncul respons `{"ok":true,"result":true,"description":"Webhook was set"}`.
+
+7. **Tes**: ketik `/laporan` di channel (kalau Anda admin) atau chat
+   pribadi ke bot. Tunggu beberapa detik, harusnya muncul balasan grafik +
+   teks laporan.
+
 ## ⚠️ PENTING — Prinsip Keamanan Data
 
 Project ini **hanya membaca (SELECT)** data dari tabel `devices` dan

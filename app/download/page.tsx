@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import { Device } from "@/lib/types";
 import DownloadClient from "@/components/download/DownloadClient";
+import ExcelReportClient from "@/components/download/ExcelReportClient";
 
 export const revalidate = 0;
 
@@ -29,8 +30,8 @@ export default async function DownloadPage() {
             Download Data Sensor
           </h1>
           <p className="mt-1 text-sm text-slate-500">
-            Export data sensor mentah ke file CSV, pilih device dan rentang
-            tanggal.
+            Export data sensor — CSV mentah, atau laporan Excel teragregasi
+            dengan grafik.
           </p>
         </header>
 
@@ -39,8 +40,20 @@ export default async function DownloadPage() {
             Tidak ada device ditemukan. Pastikan koneksi Supabase sudah benar.
           </p>
         ) : (
-          <div className="rounded-xl border border-slate-200 bg-white p-5">
-            <DownloadClient devices={devices} />
+          <div className="space-y-6">
+            <div className="rounded-xl border border-slate-200 bg-white p-5">
+              <h2 className="mb-3 text-sm font-semibold text-slate-900">
+                Laporan Excel (Ringkasan + Grafik)
+              </h2>
+              <ExcelReportClient devices={devices} />
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-white p-5">
+              <h2 className="mb-3 text-sm font-semibold text-slate-900">
+                CSV Mentah (Data Apa Adanya)
+              </h2>
+              <DownloadClient devices={devices} />
+            </div>
           </div>
         )}
       </div>
