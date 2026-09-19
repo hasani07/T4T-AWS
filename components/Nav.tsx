@@ -1,5 +1,6 @@
 "use client";
 
+import { Fragment } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -36,8 +37,7 @@ export default function Nav() {
   const pathname = usePathname();
 
   return (
-    <>
-      {/* Sidebar — desktop & tablet */}
+    <Fragment>
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-20 flex-col items-center gap-2 border-r border-slate-200/60 bg-white py-6 md:flex">
         <div className="mb-8 flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-900 text-[11px] font-bold tracking-tight text-white">
           T4T
@@ -63,7 +63,7 @@ export default function Nav() {
           })}
         </nav>
 
-        
+        <a
           href={TELEGRAM_CHANNEL_URL}
           target="_blank"
           rel="noopener noreferrer"
@@ -74,7 +74,6 @@ export default function Nav() {
         </a>
       </aside>
 
-      {/* Tab bar — mobile */}
       <nav
         className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-around border-t border-slate-200 bg-white/95 px-1 pt-2 backdrop-blur md:hidden"
         style={{ paddingBottom: "calc(0.5rem + env(safe-area-inset-bottom, 0px))" }}
@@ -96,6 +95,6 @@ export default function Nav() {
           );
         })}
       </nav>
-    </>
+    </Fragment>
   );
 }
