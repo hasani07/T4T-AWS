@@ -9,11 +9,13 @@ import {
   Sparkles,
   Send,
   DatabaseBackup,
+  CloudSun,
 } from "lucide-react";
 
 const NAV_ITEMS = [
   { href: "/", label: "Dashboard", icon: LayoutGrid },
   { href: "/analytics", label: "Analitik", icon: BarChart3 },
+  { href: "/bmkg", label: "BMKG", icon: CloudSun },
   { href: "/download", label: "Unduh", icon: Download },
   { href: "/recommendations", label: "AI", icon: Sparkles },
   { href: "/reports", label: "Laporan", icon: Send },

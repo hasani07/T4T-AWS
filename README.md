@@ -485,3 +485,44 @@ dashboard:
 Timestamp yang dibuat sendiri oleh server kita (`ai_recommendations`,
 nanti `weekly_reports`/`backup_logs`) tidak kena masalah ini, karena
 berasal dari jam server Vercel/Postgres yang benar.
+
+## Fitur Tambahan: Perbandingan dengan BMKG
+
+Halaman `/bmkg` membandingkan data sensor Anda dengan prakiraan resmi
+[BMKG](https://data.bmkg.go.id/prakiraan-cuaca/) (gratis, tanpa API key)
+untuk wilayah yang sama.
+
+**Cara pakai:**
+1. Buka halaman `/bmkg`
+2. Isi **kode wilayah adm4** (format `32.04.19.2003`) untuk masing-masing
+   device — kode ini kode kelurahan/desa dari Kemendagri, BUKAN nama
+   lokasi biasa
+3. Setelah disimpan, halaman otomatis ambil data BMKG dan tampilkan
+   perbandingan: Suhu, Kelembaban, Kecepatan Angin, Kondisi Cuaca
+
+**Cara dapat kode wilayah**: buka
+[data.bmkg.go.id/prakiraan-cuaca](https://data.bmkg.go.id/prakiraan-cuaca/),
+cari lokasi Anda lewat form pilih wilayah, lalu buka Developer Tools (F12)
+→ tab Network → cari request `prakiraan-cuaca?adm4=...` → itu kodenya.
+
+**Catatan satuan**: BMKG melaporkan kecepatan angin dalam **km/jam**,
+otomatis dikonversi ke **m/s** di `lib/bmkg.ts` biar bisa dibandingkan
+langsung dengan sensor kita.
+
+**Catatan pembaruan data**: BMKG update prakiraan ~2x/hari, jadi wajar
+kalau tidak 100% sama dengan pembacaan sensor real-time — ini
+perbandingan skala besar (prakiraan wilayah vs pembacaan titik lokasi
+presisi), bukan validasi akurasi sensor.
+
+**Isi cepat kode wilayah**: kalau tidak mau input manual lewat UI, jalankan
+`supabase/sql/007_bmkg_adm4_defaults.sql` di SQL Editor — sudah terisi
+kode resmi untuk CISANGKUY (Kiangroke) dan CIMINYAK (Baranangsiang).
+
+## Fitur Tambahan: Peta Lokasi Device
+
+Kartu "Lokasi Device" di Dashboard utama menampilkan peta (OpenStreetMap
+lewat library `leaflet`, gratis tanpa API key) dengan marker per device —
+hijau kalau online, merah kalau offline. Klik marker untuk lihat nama
+device & statusnya. Koordinat GPS device disimpan di
+`lib/config.ts` → `DEVICE_COORDINATES` (bukan di database, karena ini
+data statis lokasi fisik alat).

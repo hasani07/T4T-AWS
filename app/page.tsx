@@ -2,7 +2,9 @@ import { supabase } from "@/lib/supabase";
 import { DeviceWithLatestReading } from "@/lib/types";
 import SensorCardGrid from "@/components/SensorCardGrid";
 import PageShell from "@/components/PageShell";
+import DeviceMap, { DeviceMapMarker } from "@/components/DeviceMap";
 import { isDeviceOnline } from "@/lib/deviceStatus";
+import { DEVICE_COORDINATES } from "@/lib/config";
 import { Wifi, Thermometer, CloudRain } from "lucide-react";
 
 // Selalu ambil data terbaru saat halaman diakses, jangan pakai cache statis
@@ -90,6 +92,16 @@ export default async function DashboardPage() {
 
   const totalRainfall = readingsAvailable.reduce((sum, r) => sum + r.rainfall, 0);
 
+  const mapMarkers: DeviceMapMarker[] = devicesWithReadings
+    .filter((d) => DEVICE_COORDINATES[d.type])
+    .map((d) => ({
+      id: d.id,
+      label: d.type,
+      lat: DEVICE_COORDINATES[d.type].lat,
+      lon: DEVICE_COORDINATES[d.type].lon,
+      online: d.latest ? isDeviceOnline(d.latest.created_at) : false,
+    }));
+
   return (
     <PageShell>
       <header className="mb-6">
@@ -125,6 +137,11 @@ export default async function DashboardPage() {
       </div>
 
       <SensorCardGrid initialData={devicesWithReadings} />
+
+      <div className="mt-6 rounded-3xl bg-white p-5 shadow-[0_2px_24px_rgba(15,23,42,0.06)]">
+        <h2 className="mb-3 text-sm font-semibold text-slate-900">Lokasi Device</h2>
+        <DeviceMap devices={mapMarkers} />
+      </div>
     </PageShell>
   );
 }
