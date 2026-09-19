@@ -30,6 +30,7 @@
 // =====================================================================
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+import * as XLSX from "https://esm.sh/xlsx@0.18.5";
 
 const CALM_WIND_CODE = "U";
 const WIND_DIRECTION_LABELS: Record<string, string> = {
@@ -107,6 +108,93 @@ function bucketDailyAverage(readings: SensorReading[]): { date: string; value: n
     .map(([date, vals]) => ({ date, value: vals.reduce((s, v) => s + v, 0) / vals.length }));
 }
 
+interface DailyAgg {
+  date: string;
+  avgTemp: number;
+  avgHum: number;
+  avgWind: number;
+  totalRain: number;
+}
+
+/**
+ * Agregasi harian LENGKAP (bukan cuma suhu seperti bucketDailyAverage di
+ * atas, yang khusus dipakai untuk grafik) — dipakai untuk isi file Excel.
+ */
+function aggregateDailyFull(readings: SensorReading[]): DailyAgg[] {
+  const valid = readings.filter(isValidReading);
+  const groups: Record<string, SensorReading[]> = {};
+  for (const r of valid) {
+    const day = r.created_at.slice(0, 10);
+    if (!groups[day]) groups[day] = [];
+    groups[day].push(r);
+  }
+  const avg = (arr: number[]) => arr.reduce((s, v) => s + v, 0) / arr.length;
+  return Object.entries(groups)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, rows]) => ({
+      date,
+      avgTemp: Number(avg(rows.map((r) => r.temperature)).toFixed(1)),
+      avgHum: Number(avg(rows.map((r) => r.humidity)).toFixed(1)),
+      avgWind: Number(avg(rows.map((r) => r.wind_speed)).toFixed(2)),
+      totalRain: Number(rows.reduce((s, r) => s + r.rainfall, 0).toFixed(1)),
+    }));
+}
+
+/**
+ * Bikin file Excel (.xlsx) — 1 sheet per device, isinya ringkasan harian.
+ * Pakai library "xlsx" (SheetJS), bukan "exceljs" seperti di Next.js,
+ * karena SheetJS lebih ringan & terbukti jalan baik di Deno/Edge Function
+ * (tidak butuh Node.js API seperti fs/stream yang tidak ada di Deno).
+ */
+function buildExcelBuffer(
+  perDevice: { device: Device; readings: SensorReading[] }[]
+): Uint8Array {
+  const wb = XLSX.utils.book_new();
+
+  for (const d of perDevice) {
+    const daily = aggregateDailyFull(d.readings);
+    const rows = daily.map((r) => ({
+      Tanggal: r.date,
+      "Suhu Rata-rata (°C)": r.avgTemp,
+      "Kelembaban Rata-rata (%)": r.avgHum,
+      "Kecepatan Angin Rata-rata (m/s)": r.avgWind,
+      "Total Curah Hujan (mm)": r.totalRain,
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const sheetName = d.device.type.slice(0, 31) || `Device ${d.device.id}`;
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  }
+
+  const arrayBuffer = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+  return new Uint8Array(arrayBuffer);
+}
+
+async function sendTelegramDocumentTo(
+  chatId: number | string,
+  filename: string,
+  fileBytes: Uint8Array,
+  caption?: string
+) {
+  const token = Deno.env.get("TELEGRAM_BOT_TOKEN")!;
+  const formData = new FormData();
+  formData.append("chat_id", String(chatId));
+  if (caption) formData.append("caption", caption);
+  formData.append(
+    "document",
+    new Blob([fileBytes], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    }),
+    filename
+  );
+
+  const res = await fetch(`${TELEGRAM_API}/bot${token}/sendDocument`, {
+    method: "POST",
+    body: formData,
+  });
+  const data = await res.json();
+  if (!data.ok) console.error("Telegram sendDocument error:", data);
+}
+
 function buildTemperatureChartConfig(devicesData: { label: string; readings: SensorReading[] }[], title: string) {
   const allDatesSet = new Set<string>();
   const perDeviceDaily = devicesData.map((d) => {
@@ -176,19 +264,21 @@ function fmtDate(d: Date): string {
   return d.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Jakarta" });
 }
 
+const DIVIDER = "━━━━━━━━━━━━━━━";
+
 function formatStatsBlock(deviceLabel: string, stats: PeriodStats, recommendation: string | null): string {
   const windLabel = stats.dominantWindDirection
     ? WIND_DIRECTION_LABELS[stats.dominantWindDirection] ?? stats.dominantWindDirection
     : "Tidak ada arah dominan (calm)";
   const lines = [
-    `<b>${deviceLabel}</b>`,
-    `Suhu rata-rata: ${stats.avgTemperature?.toFixed(1) ?? "-"}°C`,
-    `Kelembaban rata-rata: ${stats.avgHumidity?.toFixed(0) ?? "-"}%`,
-    `Kecepatan angin rata-rata: ${stats.avgWindSpeed?.toFixed(1) ?? "-"} m/s`,
-    `Total curah hujan: ${stats.totalRainfall?.toFixed(1) ?? "-"} mm`,
-    `Arah angin dominan: ${windLabel}`,
+    `📍 <b>${deviceLabel}</b>`,
+    `🌡️ Suhu rata-rata: <b>${stats.avgTemperature?.toFixed(1) ?? "-"}°C</b>`,
+    `💧 Kelembaban rata-rata: <b>${stats.avgHumidity?.toFixed(0) ?? "-"}%</b>`,
+    `🌬️ Kecepatan angin rata-rata: <b>${stats.avgWindSpeed?.toFixed(1) ?? "-"} m/s</b>`,
+    `🌧️ Total curah hujan: <b>${stats.totalRainfall?.toFixed(1) ?? "-"} mm</b>`,
+    `🧭 Arah angin dominan: ${windLabel}`,
   ];
-  if (recommendation) lines.push("", `<i>Rekomendasi AI terakhir:</i> ${recommendation}`);
+  if (recommendation) lines.push("", "💡 <i>Rekomendasi AI:</i>", recommendation);
   return lines.join("\n");
 }
 
@@ -330,15 +420,31 @@ Deno.serve(async (req: Request) => {
     const chartUrl = await createQuickChartUrl(chartConfig);
 
     const headerLine =
-      `<b>📊 Laporan Diminta</b>\nPeriode: ${fmtDate(range.start)} — ${fmtDate(range.end)}`;
+      `📊 <b>Laporan Cuaca AWS T4T</b>\n🗓 Periode: ${fmtDate(range.start)} — ${fmtDate(range.end)}`;
     const bodyBlocks = perDevice.map((d) => formatStatsBlock(d.device.type, d.stats, d.recommendation));
-    const fullText = [headerLine, "", bodyBlocks.join("\n\n")].join("\n");
+    const fullText = [headerLine, DIVIDER, bodyBlocks.join(`\n${DIVIDER}\n`), DIVIDER].join("\n");
 
     if (chartUrl) {
       await sendTelegramPhotoTo(chatId, chartUrl, headerLine);
       await sendTelegramMessageTo(chatId, fullText);
     } else {
       await sendTelegramMessageTo(chatId, fullText);
+    }
+
+    // Kirim juga file Excel-nya (ringkasan harian per device)
+    try {
+      const excelBuffer = buildExcelBuffer(
+        perDevice.map((d) => ({ device: d.device, readings: d.readings }))
+      );
+      const excelFilename = `laporan_${range.start.toISOString().slice(0, 10)}_sd_${new Date(
+        range.end.getTime() - 1
+      )
+        .toISOString()
+        .slice(0, 10)}.xlsx`;
+      await sendTelegramDocumentTo(chatId, excelFilename, excelBuffer, "📎 File Excel laporan ini");
+    } catch (excelErr) {
+      console.error("Gagal membuat/kirim file Excel:", excelErr);
+      await sendTelegramMessageTo(chatId, "⚠️ Grafik & teks berhasil, tapi file Excel gagal dibuat.");
     }
 
     // Catat ke riwayat (pakai service_role supaya bisa nulis)

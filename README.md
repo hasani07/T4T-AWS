@@ -221,7 +221,19 @@ otomatis terjadwal tetap bisa dikirim ke Channel seperti biasa).
 
 7. **Tes**: ketik `/laporan` di channel (kalau Anda admin) atau chat
    pribadi ke bot. Tunggu beberapa detik, harusnya muncul balasan grafik +
-   teks laporan.
+   teks laporan + **file Excel** (ringkasan harian per device, 1 sheet per
+   device).
+
+### Catatan: File Excel di Telegram Pakai Library Berbeda
+
+Karena Edge Function jalan di Deno (bukan Node.js seperti Next.js/Vercel),
+library `exceljs` yang dipakai di `lib/excelReport.ts` **tidak dipakai** di
+sini — sebagai gantinya dipakai `xlsx` (SheetJS) yang lebih ringan dan
+terbukti kompatibel dengan Deno. Fungsinya sama (bikin file Excel), tapi
+Excel dari Telegram ini **berisi ringkasan harian saja** (tanpa grafik
+tertanam di dalam file-nya, karena grafiknya sudah dikirim terpisah
+sebagai foto) — beda dengan Excel dari halaman `/download` yang grafiknya
+memang ditempel langsung di dalam file.
 
 ## ⚠️ PENTING — Prinsip Keamanan Data
 

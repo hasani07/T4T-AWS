@@ -111,6 +111,8 @@ function fmtDelta(d: number | null): string {
   return ` (${d > 0 ? "+" : ""}${d.toFixed(1)}% vs periode sebelumnya)`;
 }
 
+const DIVIDER = "━━━━━━━━━━━━━━━";
+
 function formatStatsBlock(
   deviceLabel: string,
   stats: PeriodStats,
@@ -126,16 +128,16 @@ function formatStatsBlock(
     : "Tidak ada arah dominan (calm)";
 
   const lines = [
-    `<b>${deviceLabel}</b>`,
-    `Suhu rata-rata: ${stats.avgTemperature?.toFixed(1) ?? "-"}°C${fmtDelta(deltaTemp)}`,
-    `Kelembaban rata-rata: ${stats.avgHumidity?.toFixed(0) ?? "-"}%${fmtDelta(deltaHum)}`,
-    `Kecepatan angin rata-rata: ${stats.avgWindSpeed?.toFixed(1) ?? "-"} m/s`,
-    `Total curah hujan: ${stats.totalRainfall?.toFixed(1) ?? "-"} mm${fmtDelta(deltaRain)}`,
-    `Arah angin dominan: ${windLabel}`,
+    `📍 <b>${deviceLabel}</b>`,
+    `🌡️ Suhu rata-rata: <b>${stats.avgTemperature?.toFixed(1) ?? "-"}°C</b>${fmtDelta(deltaTemp)}`,
+    `💧 Kelembaban rata-rata: <b>${stats.avgHumidity?.toFixed(0) ?? "-"}%</b>${fmtDelta(deltaHum)}`,
+    `🌬️ Kecepatan angin rata-rata: <b>${stats.avgWindSpeed?.toFixed(1) ?? "-"} m/s</b>`,
+    `🌧️ Total curah hujan: <b>${stats.totalRainfall?.toFixed(1) ?? "-"} mm</b>${fmtDelta(deltaRain)}`,
+    `🧭 Arah angin dominan: ${windLabel}`,
   ];
 
   if (recommendation) {
-    lines.push("", `<i>Rekomendasi AI terakhir:</i> ${recommendation}`);
+    lines.push("", "💡 <i>Rekomendasi AI:</i>", recommendation);
   }
 
   return lines.join("\n");
@@ -187,13 +189,13 @@ export async function generateWeeklyReport(
   const chartUrl = await createQuickChartUrl(chartConfig);
 
   const periodLabel = `${formatDateShort(range.start)} — ${formatDateShort(range.end)}`;
-  const headerLine = `<b>📊 Laporan Mingguan AWS T4T</b>\nPeriode: ${periodLabel} (${intervalDays} hari)`;
+  const headerLine = `📊 <b>Laporan Mingguan AWS T4T</b>\n🗓 Periode: ${periodLabel} (${intervalDays} hari)`;
 
   const bodyBlocks = perDevice.map((d) =>
     formatStatsBlock(d.device.type, d.stats, d.prevStats, d.recommendation)
   );
 
-  const fullText = [headerLine, "", bodyBlocks.join("\n\n")].join("\n");
+  const fullText = [headerLine, DIVIDER, bodyBlocks.join(`\n${DIVIDER}\n`), DIVIDER].join("\n");
 
   let status: "sent" | "failed" = "sent";
   let telegramMessageId: string | undefined;

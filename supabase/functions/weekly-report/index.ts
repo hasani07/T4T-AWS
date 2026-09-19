@@ -17,6 +17,7 @@
 // =====================================================================
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+import * as XLSX from "https://esm.sh/xlsx@0.18.5";
 
 // ---------- Tipe & konstanta ----------
 const CALM_WIND_CODE = "U";
@@ -242,10 +243,85 @@ async function sendTelegramMessage(text: string): Promise<string | undefined> {
   return data.result?.message_id ? String(data.result.message_id) : undefined;
 }
 
+interface DailyAgg {
+  date: string;
+  avgTemp: number;
+  avgHum: number;
+  avgWind: number;
+  totalRain: number;
+}
+
+function aggregateDailyFull(readings: SensorReading[]): DailyAgg[] {
+  const valid = readings.filter(isValidReading);
+  const groups: Record<string, SensorReading[]> = {};
+  for (const r of valid) {
+    const day = r.created_at.slice(0, 10);
+    if (!groups[day]) groups[day] = [];
+    groups[day].push(r);
+  }
+  const avg = (arr: number[]) => arr.reduce((s, v) => s + v, 0) / arr.length;
+  return Object.entries(groups)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, rows]) => ({
+      date,
+      avgTemp: Number(avg(rows.map((r) => r.temperature)).toFixed(1)),
+      avgHum: Number(avg(rows.map((r) => r.humidity)).toFixed(1)),
+      avgWind: Number(avg(rows.map((r) => r.wind_speed)).toFixed(2)),
+      totalRain: Number(rows.reduce((s, r) => s + r.rainfall, 0).toFixed(1)),
+    }));
+}
+
+/**
+ * Bikin file Excel (.xlsx) — 1 sheet per device, isinya ringkasan harian.
+ * Pakai library "xlsx" (SheetJS): ringan & terbukti jalan baik di Deno,
+ * beda dengan "exceljs" yang dipakai di sisi Next.js.
+ */
+function buildExcelBuffer(perDevice: { device: Device; readings: SensorReading[] }[]): Uint8Array {
+  const wb = XLSX.utils.book_new();
+  for (const d of perDevice) {
+    const daily = aggregateDailyFull(d.readings);
+    const rows = daily.map((r) => ({
+      Tanggal: r.date,
+      "Suhu Rata-rata (°C)": r.avgTemp,
+      "Kelembaban Rata-rata (%)": r.avgHum,
+      "Kecepatan Angin Rata-rata (m/s)": r.avgWind,
+      "Total Curah Hujan (mm)": r.totalRain,
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const sheetName = d.device.type.slice(0, 31) || `Device ${d.device.id}`;
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  }
+  const arrayBuffer = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+  return new Uint8Array(arrayBuffer);
+}
+
+async function sendTelegramDocument(filename: string, fileBytes: Uint8Array, caption?: string) {
+  const token = Deno.env.get("TELEGRAM_BOT_TOKEN")!;
+  const chatId = Deno.env.get("TELEGRAM_CHAT_ID")!;
+  const formData = new FormData();
+  formData.append("chat_id", chatId);
+  if (caption) formData.append("caption", caption);
+  formData.append(
+    "document",
+    new Blob([fileBytes], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    }),
+    filename
+  );
+  const res = await fetch(`${TELEGRAM_API}/bot${token}/sendDocument`, {
+    method: "POST",
+    body: formData,
+  });
+  const data = await res.json();
+  if (!data.ok) console.error("Telegram sendDocument error:", data);
+}
+
 function fmtDelta(d: number | null): string {
   if (d === null) return "";
   return ` (${d > 0 ? "+" : ""}${d.toFixed(1)}% vs periode sebelumnya)`;
 }
+
+const DIVIDER = "━━━━━━━━━━━━━━━";
 
 function formatDateShort(d: Date): string {
   return d.toLocaleDateString("id-ID", {
@@ -270,14 +346,14 @@ function formatStatsBlock(
     : "Tidak ada arah dominan (calm)";
 
   const lines = [
-    `<b>${deviceLabel}</b>`,
-    `Suhu rata-rata: ${stats.avgTemperature?.toFixed(1) ?? "-"}°C${fmtDelta(deltaTemp)}`,
-    `Kelembaban rata-rata: ${stats.avgHumidity?.toFixed(0) ?? "-"}%${fmtDelta(deltaHum)}`,
-    `Kecepatan angin rata-rata: ${stats.avgWindSpeed?.toFixed(1) ?? "-"} m/s`,
-    `Total curah hujan: ${stats.totalRainfall?.toFixed(1) ?? "-"} mm${fmtDelta(deltaRain)}`,
-    `Arah angin dominan: ${windLabel}`,
+    `📍 <b>${deviceLabel}</b>`,
+    `🌡️ Suhu rata-rata: <b>${stats.avgTemperature?.toFixed(1) ?? "-"}°C</b>${fmtDelta(deltaTemp)}`,
+    `💧 Kelembaban rata-rata: <b>${stats.avgHumidity?.toFixed(0) ?? "-"}%</b>${fmtDelta(deltaHum)}`,
+    `🌬️ Kecepatan angin rata-rata: <b>${stats.avgWindSpeed?.toFixed(1) ?? "-"} m/s</b>`,
+    `🌧️ Total curah hujan: <b>${stats.totalRainfall?.toFixed(1) ?? "-"} mm</b>${fmtDelta(deltaRain)}`,
+    `🧭 Arah angin dominan: ${windLabel}`,
   ];
-  if (recommendation) lines.push("", `<i>Rekomendasi AI terakhir:</i> ${recommendation}`);
+  if (recommendation) lines.push("", "💡 <i>Rekomendasi AI:</i>", recommendation);
   return lines.join("\n");
 }
 
@@ -368,11 +444,11 @@ Deno.serve(async (_req: Request) => {
     const chartUrl = await createQuickChartUrl(chartConfig);
 
     const periodLabel = `${formatDateShort(range.start)} — ${formatDateShort(range.end)}`;
-    const headerLine = `<b>📊 Laporan Mingguan AWS T4T</b>\nPeriode: ${periodLabel} (${intervalDays} hari)`;
+    const headerLine = `📊 <b>Laporan Mingguan AWS T4T</b>\n🗓 Periode: ${periodLabel} (${intervalDays} hari)`;
     const bodyBlocks = perDevice.map((d) =>
       formatStatsBlock(d.device.type, d.stats, d.prevStats, d.recommendation)
     );
-    const fullText = [headerLine, "", bodyBlocks.join("\n\n")].join("\n");
+    const fullText = [headerLine, DIVIDER, bodyBlocks.join(`\n${DIVIDER}\n`), DIVIDER].join("\n");
 
     let status: "sent" | "failed" = "sent";
     let telegramMessageId: string | undefined;
@@ -385,6 +461,16 @@ Deno.serve(async (_req: Request) => {
       } else {
         telegramMessageId = await sendTelegramMessage(fullText);
       }
+
+      const excelBuffer = buildExcelBuffer(
+        perDevice.map((d) => ({ device: d.device, readings: d.readings }))
+      );
+      const excelFilename = `laporan_mingguan_${range.start.toISOString().slice(0, 10)}_sd_${new Date(
+        range.end.getTime() - 1
+      )
+        .toISOString()
+        .slice(0, 10)}.xlsx`;
+      await sendTelegramDocument(excelFilename, excelBuffer, "📎 File Excel laporan ini");
     } catch (err) {
       status = "failed";
       errorMessage = err instanceof Error ? err.message : String(err);
