@@ -1,11 +1,10 @@
 import { supabase } from "@/lib/supabase";
 import { getSetting } from "@/lib/settings";
 import { fetchBmkgForecast, findNearestEntry } from "@/lib/bmkg";
-import { WIND_DIRECTION_LABELS } from "@/lib/config";
 import PageShell from "@/components/PageShell";
-import BmkgAdm4Setting from "@/components/bmkg/BmkgAdm4Setting";
+import AutoRefresher from "@/components/AutoRefresher";
+import BmkgCompareCard from "@/components/bmkg/BmkgCompareCard";
 import { Device, SensorReading } from "@/lib/types";
-import { CloudSun, Radio } from "lucide-react";
 
 export const revalidate = 0;
 
@@ -29,10 +28,6 @@ async function getLatestReading(deviceId: number): Promise<SensorReading | null>
   return data[0];
 }
 
-function fmt(n: number | null | undefined, digits = 1): string {
-  return n === null || n === undefined || Number.isNaN(n) ? "-" : n.toFixed(digits);
-}
-
 export default async function BmkgPage() {
   const devices = await getDevices();
 
@@ -48,6 +43,13 @@ export default async function BmkgPage() {
 
   return (
     <PageShell>
+      {/* Sisi "Sensor Kami" di tiap kartu sudah reaktif sendiri lewat
+          Supabase Realtime (lihat BmkgCompareCard) — begitu ada data baru
+          masuk, langsung update TANPA nunggu refresh ini. AutoRefresher di
+          sini cuma untuk sisi BMKG (yang emang jarang berubah, ~2x/hari)
+          dan supaya kode wilayah yang baru disimpan ikut ke-refresh. */}
+      <AutoRefresher intervalMs={2 * 60 * 1000} />
+
       <header className="mb-6">
         <h1 className="text-2xl font-semibold text-slate-900">
           Perbandingan dengan BMKG
@@ -64,95 +66,23 @@ export default async function BmkgPage() {
           </a>{" "}
           untuk wilayah yang sama.
         </p>
+        <p className="mt-1 text-xs text-slate-400">
+          Sisi &quot;Sensor Kami&quot; update otomatis real-time begitu ada
+          data baru masuk. Sisi BMKG dicek ulang tiap 2 menit.
+        </p>
       </header>
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         {cards.map(({ device, adm4, latest, forecast, nearest }) => (
-          <div
+          <BmkgCompareCard
             key={device.id}
-            className="rounded-3xl bg-white p-5 shadow-[0_2px_24px_rgba(15,23,42,0.06)]"
-          >
-            <h2 className="text-base font-semibold text-slate-900">{device.type}</h2>
-
-            <div className="mt-3">
-              <p className="mb-1.5 text-xs text-slate-500">
-                Kode wilayah BMKG (adm4)
-                {forecast && (
-                  <span className="ml-1 text-slate-400">
-                    — {forecast.location.desa}, {forecast.location.kecamatan},{" "}
-                    {forecast.location.kotkab}
-                  </span>
-                )}
-              </p>
-              <BmkgAdm4Setting deviceId={device.id} initialAdm4={adm4} />
-            </div>
-
-            {!adm4 && (
-              <p className="mt-4 text-sm text-slate-400">
-                Isi kode wilayah dulu untuk melihat perbandingan.
-              </p>
-            )}
-
-            {adm4 && !forecast && (
-              <p className="mt-4 text-sm text-rose-500">
-                Gagal mengambil data BMKG — cek lagi kode wilayahnya sudah benar.
-              </p>
-            )}
-
-            {forecast && nearest && (
-              <div className="mt-4 grid grid-cols-2 gap-3">
-                <div className="rounded-2xl bg-slate-50 p-4">
-                  <div className="mb-2 flex items-center gap-2 text-xs font-medium text-slate-500">
-                    <Radio size={14} /> Sensor Kami
-                  </div>
-                  <p className="text-sm text-slate-900">
-                    Suhu: <b>{fmt(latest?.temperature)}°C</b>
-                  </p>
-                  <p className="text-sm text-slate-900">
-                    Kelembaban: <b>{fmt(latest?.humidity, 0)}%</b>
-                  </p>
-                  <p className="text-sm text-slate-900">
-                    Angin: <b>{fmt(latest?.wind_speed)} m/s</b>
-                  </p>
-                  <p className="text-sm text-slate-900">
-                    Arah:{" "}
-                    <b>
-                      {latest
-                        ? WIND_DIRECTION_LABELS[latest.wind_direction] ?? latest.wind_direction
-                        : "-"}
-                    </b>
-                  </p>
-                </div>
-
-                <div className="rounded-2xl bg-sky-50 p-4">
-                  <div className="mb-2 flex items-center gap-2 text-xs font-medium text-sky-600">
-                    <CloudSun size={14} /> BMKG
-                  </div>
-                  <p className="text-sm text-slate-900">
-                    Suhu: <b>{fmt(nearest.temperature)}°C</b>
-                  </p>
-                  <p className="text-sm text-slate-900">
-                    Kelembaban: <b>{fmt(nearest.humidity, 0)}%</b>
-                  </p>
-                  <p className="text-sm text-slate-900">
-                    Angin: <b>{fmt(nearest.windSpeedMs)} m/s</b>
-                  </p>
-                  <p className="text-sm text-slate-900">
-                    Kondisi: <b>{nearest.weatherDesc}</b>
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {forecast && nearest && latest && (
-              <div className="mt-3 rounded-2xl bg-amber-50 p-3 text-xs text-amber-700">
-                Selisih suhu:{" "}
-                <b>{fmt(Math.abs(latest.temperature - nearest.temperature))}°C</b> ·
-                Selisih kelembaban:{" "}
-                <b>{fmt(Math.abs(latest.humidity - nearest.humidity), 0)}%</b>
-              </div>
-            )}
-          </div>
+            device={device}
+            initialLatest={latest}
+            adm4={adm4}
+            forecastLocation={forecast?.location ?? null}
+            nearest={nearest}
+            hasForecastError={!!adm4 && !forecast}
+          />
         ))}
       </div>
 

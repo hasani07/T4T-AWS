@@ -28,7 +28,7 @@ export default function LiveClock() {
   });
 
   return (
-    <div className="rounded-2xl bg-white px-5 py-3 text-right shadow-[0_2px_20px_rgba(15,23,42,0.06)]">
+    <div className="w-fit self-start rounded-2xl bg-white px-5 py-3 text-left shadow-[0_2px_20px_rgba(15,23,42,0.06)] sm:ml-auto sm:self-auto sm:text-right">
       <p className="text-lg font-semibold tabular-nums text-slate-900">{timeStr} WIB</p>
       <p className="text-xs text-slate-400">{dateStr}</p>
     </div>

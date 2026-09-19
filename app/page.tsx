@@ -61,16 +61,17 @@ function SummaryPill({
   label: string;
 }) {
   return (
-    <div className="flex items-center gap-3 rounded-2xl bg-white px-4 py-3 shadow-[0_2px_20px_rgba(15,23,42,0.06)]">
+    <div className="flex items-center gap-2.5 rounded-2xl bg-white px-3 py-3 shadow-[0_2px_20px_rgba(15,23,42,0.06)] sm:gap-3 sm:px-4">
       <span
-        className="flex h-10 w-10 items-center justify-center rounded-full text-white"
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white sm:h-10 sm:w-10"
         style={{ backgroundColor: color }}
       >
-        <Icon size={18} strokeWidth={2.25} />
+        <Icon size={16} strokeWidth={2.25} className="sm:hidden" />
+        <Icon size={18} strokeWidth={2.25} className="hidden sm:block" />
       </span>
-      <div>
-        <p className="text-sm font-semibold text-slate-900">{value}</p>
-        <p className="text-xs text-slate-400">{label}</p>
+      <div className="min-w-0">
+        <p className="truncate text-sm font-semibold text-slate-900">{value}</p>
+        <p className="truncate text-[11px] text-slate-400 sm:text-xs">{label}</p>
       </div>
     </div>
   );
@@ -128,7 +129,7 @@ export default async function DashboardPage() {
         <LiveClock />
       </header>
 
-      <div className="mb-6 flex flex-wrap gap-3">
+      <div className="mb-6 grid grid-cols-2 gap-3 md:flex md:flex-wrap">
         <SummaryPill
           icon={Wifi}
           color="#34D399"

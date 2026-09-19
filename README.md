@@ -526,3 +526,15 @@ hijau kalau online, merah kalau offline. Klik marker untuk lihat nama
 device & statusnya. Koordinat GPS device disimpan di
 `lib/config.ts` → `DEVICE_COORDINATES` (bukan di database, karena ini
 data statis lokasi fisik alat).
+
+## Catatan: Auto-Refresh
+
+- **Dashboard (kartu sensor)**: otomatis update via Supabase Realtime,
+  tidak perlu reload sama sekali.
+- **Analitik (grafik & statistik)**: auto-refresh tiap **2 menit** di
+  background (tanpa mengganggu tampilan/spinner), plus tombol
+  "🔄 Refresh" untuk update instan kapan saja + label "update terakhir".
+- Halaman lain (BMKG, Backup, Rekomendasi AI, Laporan) masih ambil data
+  fresh setiap kali halaman itu **dibuka/dinavigasi ulang** (server-side,
+  `revalidate = 0`), tapi belum auto-refresh berkala kalau dibiarkan
+  terbuka lama tanpa berpindah halaman.
