@@ -4,9 +4,10 @@ import SensorCardGrid from "@/components/SensorCardGrid";
 import PageShell from "@/components/PageShell";
 import DeviceMap, { DeviceMapMarker } from "@/components/DeviceMap";
 import TelegramJoinCard from "@/components/TelegramJoinCard";
+import LiveClock from "@/components/LiveClock";
 import { isDeviceOnline } from "@/lib/deviceStatus";
 import { DEVICE_COORDINATES } from "@/lib/config";
-import { Wifi, Thermometer, CloudRain } from "lucide-react";
+import { Wifi, Thermometer, CloudRain, Droplets, Wind } from "lucide-react";
 
 // Selalu ambil data terbaru saat halaman diakses, jangan pakai cache statis
 export const revalidate = 0;
@@ -91,6 +92,16 @@ export default async function DashboardPage() {
       ? readingsAvailable.reduce((sum, r) => sum + r.temperature, 0) / readingsAvailable.length
       : null;
 
+  const avgHumidity =
+    readingsAvailable.length > 0
+      ? readingsAvailable.reduce((sum, r) => sum + r.humidity, 0) / readingsAvailable.length
+      : null;
+
+  const avgWind =
+    readingsAvailable.length > 0
+      ? readingsAvailable.reduce((sum, r) => sum + r.wind_speed, 0) / readingsAvailable.length
+      : null;
+
   const totalRainfall = readingsAvailable.reduce((sum, r) => sum + r.rainfall, 0);
 
   const mapMarkers: DeviceMapMarker[] = devicesWithReadings
@@ -105,13 +116,16 @@ export default async function DashboardPage() {
 
   return (
     <PageShell>
-      <header className="mb-6">
-        <h1 className="text-2xl font-semibold text-slate-900">
-          Dashboard Monitoring Mikroklimat
-        </h1>
-        <p className="mt-1 text-sm text-slate-500">
-          AWS T4T — data langsung dari Supabase (read-only)
-        </p>
+      <header className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 className="text-2xl font-semibold text-slate-900">
+            Dashboard Monitoring Mikroklimat
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">
+            AWS T4T — data langsung dari Supabase (read-only)
+          </p>
+        </div>
+        <LiveClock />
       </header>
 
       <div className="mb-6 flex flex-wrap gap-3">
@@ -127,6 +141,22 @@ export default async function DashboardPage() {
             color="#FB923C"
             value={`${avgTemp.toFixed(1)}°C`}
             label="Rata-rata Suhu Saat Ini"
+          />
+        )}
+        {avgHumidity !== null && (
+          <SummaryPill
+            icon={Droplets}
+            color="#38BDF8"
+            value={`${avgHumidity.toFixed(0)}%`}
+            label="Rata-rata Kelembaban"
+          />
+        )}
+        {avgWind !== null && (
+          <SummaryPill
+            icon={Wind}
+            color="#A78BFA"
+            value={`${avgWind.toFixed(1)} m/s`}
+            label="Rata-rata Kecepatan Angin"
           />
         )}
         <SummaryPill
