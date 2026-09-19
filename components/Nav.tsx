@@ -63,7 +63,7 @@ export default function Nav() {
           })}
         </nav>
 
-        <a
+        
           href={TELEGRAM_CHANNEL_URL}
           target="_blank"
           rel="noopener noreferrer"
@@ -75,7 +75,10 @@ export default function Nav() {
       </aside>
 
       {/* Tab bar — mobile */}
-      <nav className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-around border-t border-slate-200 bg-white/95 px-1 py-2 backdrop-blur md:hidden">
+      <nav
+        className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-around border-t border-slate-200 bg-white/95 px-1 pt-2 backdrop-blur md:hidden"
+        style={{ paddingBottom: "calc(0.5rem + env(safe-area-inset-bottom, 0px))" }}
+      >
         {NAV_ITEMS.map((item) => {
           const active = pathname === item.href;
           const Icon = item.icon;
