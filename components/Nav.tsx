@@ -38,7 +38,7 @@ export default function Nav() {
 
   return (
     <Fragment>
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-20 flex-col items-center gap-2 border-r border-slate-200/60 bg-white py-6 md:flex">
+      <aside className="fixed inset-y-0 left-0 z-50 hidden w-20 flex-col items-center gap-2 border-r border-slate-200/60 bg-white py-6 md:flex">
         <div className="mb-8 flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-900 text-[11px] font-bold tracking-tight text-white">
           T4T
         </div>
@@ -75,7 +75,7 @@ export default function Nav() {
       </aside>
 
       <nav
-        className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-around border-t border-slate-200 bg-white/95 px-1 pt-2 backdrop-blur md:hidden"
+        className="fixed inset-x-0 bottom-0 z-50 flex items-center justify-around border-t border-slate-200 bg-white/95 px-1 pt-2 backdrop-blur md:hidden"
         style={{ paddingBottom: "calc(0.5rem + env(safe-area-inset-bottom, 0px))" }}
       >
         {NAV_ITEMS.map((item) => {

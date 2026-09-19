@@ -83,11 +83,16 @@ export default function DeviceMap({ devices }: { devices: DeviceMapMarker[] }) {
 
   if (devices.length === 0) {
     return (
-      <div className="flex h-72 items-center justify-center rounded-3xl bg-slate-50 text-sm text-slate-400">
+      <div className="relative z-0 flex h-72 items-center justify-center overflow-hidden rounded-3xl bg-slate-50 text-sm text-slate-400">
         Belum ada koordinat device untuk ditampilkan di peta.
       </div>
     );
   }
 
-  return <div ref={containerRef} className="h-72 w-full rounded-3xl md:h-80" />;
+  return (
+    <div
+      ref={containerRef}
+      className="relative z-0 h-72 w-full overflow-hidden rounded-3xl md:h-80"
+    />
+  );
 }

@@ -174,7 +174,7 @@ export default async function DashboardPage() {
         <TelegramJoinCard />
       </div>
 
-      <div className="rounded-3xl bg-white p-5 shadow-[0_2px_24px_rgba(15,23,42,0.06)]">
+      <div className="relative z-0 rounded-3xl bg-white p-5 shadow-[0_2px_24px_rgba(15,23,42,0.06)]">
         <h2 className="mb-3 text-sm font-semibold text-slate-900">Lokasi Device</h2>
         <DeviceMap devices={mapMarkers} />
       </div>
