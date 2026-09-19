@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import PageShell from "@/components/PageShell";
 import { Device } from "@/lib/types";
 import DownloadClient from "@/components/download/DownloadClient";
 import ExcelReportClient from "@/components/download/ExcelReportClient";
@@ -23,8 +24,7 @@ export default async function DownloadPage() {
   const devices = await getDevices();
 
   return (
-    <main className="min-h-screen bg-slate-50 px-6 py-10">
-      <div className="mx-auto max-w-5xl">
+    <PageShell>
         <header className="mb-8">
           <h1 className="text-2xl font-semibold text-slate-900">
             Download Data Sensor
@@ -41,14 +41,14 @@ export default async function DownloadPage() {
           </p>
         ) : (
           <div className="space-y-6">
-            <div className="rounded-xl border border-slate-200 bg-white p-5">
+            <div className="rounded-2xl border border-slate-200 bg-white p-5">
               <h2 className="mb-3 text-sm font-semibold text-slate-900">
                 Laporan Excel (Ringkasan + Grafik)
               </h2>
               <ExcelReportClient devices={devices} />
             </div>
 
-            <div className="rounded-xl border border-slate-200 bg-white p-5">
+            <div className="rounded-2xl border border-slate-200 bg-white p-5">
               <h2 className="mb-3 text-sm font-semibold text-slate-900">
                 CSV Mentah (Data Apa Adanya)
               </h2>
@@ -56,7 +56,6 @@ export default async function DownloadPage() {
             </div>
           </div>
         )}
-      </div>
-    </main>
+    </PageShell>
   );
 }

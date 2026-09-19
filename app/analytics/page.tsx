@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import PageShell from "@/components/PageShell";
 import { Device } from "@/lib/types";
 import AnalyticsClient from "@/components/analytics/AnalyticsClient";
 
@@ -22,8 +23,7 @@ export default async function AnalyticsPage() {
   const devices = await getDevices();
 
   return (
-    <main className="min-h-screen bg-slate-50 px-6 py-10">
-      <div className="mx-auto max-w-5xl">
+    <PageShell>
         <header className="mb-8">
           <h1 className="text-2xl font-semibold text-slate-900">
             Analitik &amp; Perbandingan Periode
@@ -35,7 +35,6 @@ export default async function AnalyticsPage() {
         </header>
 
         <AnalyticsClient devices={devices} />
-      </div>
-    </main>
+    </PageShell>
   );
 }

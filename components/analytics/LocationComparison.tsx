@@ -32,7 +32,7 @@ export default function LocationComparison({ devices, statsByDevice }: Props) {
   const isTwoDevices = devices.length === 2;
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4">
+    <div className="rounded-2xl border border-slate-200 bg-white p-4">
       <h3 className="mb-1 text-sm font-semibold text-slate-900">
         Perbandingan Antar Lokasi
       </h3>

@@ -224,6 +224,25 @@ otomatis terjadwal tetap bisa dikirim ke Channel seperti biasa).
    teks laporan + **file Excel** (ringkasan harian per device, 1 sheet per
    device).
 
+### Fitur Tombol (Klik, Tidak Perlu Ngetik)
+
+Ketik `/start` atau `/menu` sekali (boleh siapa saja di channel, tidak
+harus admin) — bot akan balas dengan **3 tombol**: "📅 Hari Ini",
+"📆 Minggu Ini", "🗓️ Bulan Ini". Tinggal klik salah satu, laporan langsung
+digenerate tanpa perlu ketik command sama sekali.
+
+**Kenapa tombol ini bisa dipakai semua orang, sedangkan command teks
+cuma admin?** Karena klik tombol (Inline Keyboard) itu jenis interaksi
+Telegram yang berbeda dari mengirim pesan — namanya "callback query",
+dan itu tidak kena batasan "cuma admin yang bisa kirim pesan di channel".
+
+**Opsional**: supaya command `/laporan` juga muncul di menu "/" bawaan
+Telegram (autocomplete saat mulai ngetik "/"), jalankan sekali di browser
+(ganti TOKEN-nya):
+```
+https://api.telegram.org/bot<TOKEN>/setMyCommands?commands=[{"command":"menu","description":"Tampilkan tombol pilihan laporan"},{"command":"laporan","description":"Generate laporan (contoh: /laporan minggu)"}]
+```
+
 ### Catatan: File Excel di Telegram Pakai Library Berbeda
 
 Karena Edge Function jalan di Deno (bukan Node.js seperti Next.js/Vercel),

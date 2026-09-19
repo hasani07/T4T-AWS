@@ -61,7 +61,7 @@ export default function BackupList({ rows }: { rows: BackupRow[] }) {
         const isUrgent = !row.downloaded && !row.expired && left <= 1;
 
         return (
-          <div key={row.id} className="rounded-xl border border-slate-200 bg-white p-4">
+          <div key={row.id} className="rounded-2xl border border-slate-200 bg-white p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <span className="text-sm font-semibold text-slate-900">

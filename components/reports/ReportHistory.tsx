@@ -16,7 +16,7 @@ export default function ReportHistory({ rows }: { rows: HistoryRow[] }) {
   return (
     <div className="space-y-3">
       {rows.map((row) => (
-        <div key={row.id} className="rounded-xl border border-slate-200 bg-white p-4">
+        <div key={row.id} className="rounded-2xl border border-slate-200 bg-white p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <span className="text-sm font-semibold text-slate-900">

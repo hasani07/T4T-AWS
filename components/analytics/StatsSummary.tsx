@@ -32,7 +32,7 @@ function StatCard({
   deltaAvg: number | null;
 }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4">
+    <div className="rounded-2xl border border-slate-200 bg-white p-4">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-slate-900">{label}</h3>
         <DeltaBadge pct={deltaAvg} />
@@ -96,7 +96,7 @@ export default function StatsSummary({
           )}
         />
 
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
+        <div className="rounded-2xl border border-slate-200 bg-white p-4">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-slate-900">
               Curah Hujan (Total)
@@ -120,7 +120,7 @@ export default function StatsSummary({
         </div>
       </div>
 
-      <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
+      <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
         <h3 className="text-sm font-semibold text-slate-900">
           Arah Angin Dominan
         </h3>

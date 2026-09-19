@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import PageShell from "@/components/PageShell";
 import { getSetting } from "@/lib/settings";
 import QuotaSettings from "@/components/backups/QuotaSettings";
 import BackupList from "@/components/backups/BackupList";
@@ -48,8 +49,7 @@ export default async function BackupsPage() {
   ]);
 
   return (
-    <main className="min-h-screen bg-slate-50 px-6 py-10">
-      <div className="mx-auto max-w-5xl">
+    <PageShell>
         <header className="mb-8">
           <h1 className="text-2xl font-semibold text-slate-900">Backup Database</h1>
           <p className="mt-1 text-sm text-slate-500">
@@ -64,7 +64,6 @@ export default async function BackupsPage() {
 
         <h2 className="mb-3 text-sm font-semibold text-slate-900">Daftar Backup</h2>
         <BackupList rows={backups} />
-      </div>
-    </main>
+    </PageShell>
   );
 }

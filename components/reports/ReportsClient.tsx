@@ -52,7 +52,7 @@ export default function ReportsClient({ initialIntervalDays }: { initialInterval
 
   return (
     <div className="space-y-6">
-      <div className="rounded-xl border border-slate-200 bg-white p-4">
+      <div className="rounded-2xl border border-slate-200 bg-white p-4">
         <h3 className="text-sm font-semibold text-slate-900">Interval Otomatis</h3>
         <p className="mt-1 text-xs text-slate-500">
           Laporan otomatis dicek setiap pagi, tapi baru benar-benar dikirim
@@ -82,7 +82,7 @@ export default function ReportsClient({ initialIntervalDays }: { initialInterval
         {intervalError && <p className="mt-2 text-sm text-rose-600">{intervalError}</p>}
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-4">
+      <div className="rounded-2xl border border-slate-200 bg-white p-4">
         <h3 className="text-sm font-semibold text-slate-900">Generate Manual</h3>
         <p className="mt-1 text-xs text-slate-500">
           Kirim laporan sekarang juga ke Telegram, di luar jadwal otomatis.

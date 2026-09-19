@@ -1,6 +1,9 @@
 import { supabase } from "@/lib/supabase";
 import { DeviceWithLatestReading } from "@/lib/types";
 import SensorCardGrid from "@/components/SensorCardGrid";
+import PageShell from "@/components/PageShell";
+import { isDeviceOnline } from "@/lib/deviceStatus";
+import { Wifi, Thermometer, CloudRain } from "lucide-react";
 
 // Selalu ambil data terbaru saat halaman diakses, jangan pakai cache statis
 export const revalidate = 0;
@@ -42,23 +45,86 @@ async function getDevicesWithLatestReadings(): Promise<DeviceWithLatestReading[]
   return results;
 }
 
+function SummaryPill({
+  icon: Icon,
+  color,
+  value,
+  label,
+}: {
+  icon: typeof Wifi;
+  color: string;
+  value: string;
+  label: string;
+}) {
+  return (
+    <div className="flex items-center gap-3 rounded-2xl bg-white px-4 py-3 shadow-[0_2px_20px_rgba(15,23,42,0.06)]">
+      <span
+        className="flex h-10 w-10 items-center justify-center rounded-full text-white"
+        style={{ backgroundColor: color }}
+      >
+        <Icon size={18} strokeWidth={2.25} />
+      </span>
+      <div>
+        <p className="text-sm font-semibold text-slate-900">{value}</p>
+        <p className="text-xs text-slate-400">{label}</p>
+      </div>
+    </div>
+  );
+}
+
 export default async function DashboardPage() {
   const devicesWithReadings = await getDevicesWithLatestReadings();
 
-  return (
-    <main className="min-h-screen bg-slate-50 px-6 py-10">
-      <div className="mx-auto max-w-5xl">
-        <header className="mb-8">
-          <h1 className="text-2xl font-semibold text-slate-900">
-            Dashboard Monitoring Mikroklimat
-          </h1>
-          <p className="mt-1 text-sm text-slate-500">
-            AWS T4T — data langsung dari Supabase (read-only)
-          </p>
-        </header>
+  const onlineCount = devicesWithReadings.filter(
+    (d) => d.latest && isDeviceOnline(d.latest.created_at)
+  ).length;
 
-        <SensorCardGrid initialData={devicesWithReadings} />
+  const readingsAvailable = devicesWithReadings
+    .map((d) => d.latest)
+    .filter((r): r is NonNullable<typeof r> => r !== null);
+
+  const avgTemp =
+    readingsAvailable.length > 0
+      ? readingsAvailable.reduce((sum, r) => sum + r.temperature, 0) / readingsAvailable.length
+      : null;
+
+  const totalRainfall = readingsAvailable.reduce((sum, r) => sum + r.rainfall, 0);
+
+  return (
+    <PageShell>
+      <header className="mb-6">
+        <h1 className="text-2xl font-semibold text-slate-900">
+          Dashboard Monitoring Mikroklimat
+        </h1>
+        <p className="mt-1 text-sm text-slate-500">
+          AWS T4T — data langsung dari Supabase (read-only)
+        </p>
+      </header>
+
+      <div className="mb-6 flex flex-wrap gap-3">
+        <SummaryPill
+          icon={Wifi}
+          color="#34D399"
+          value={`${onlineCount}/${devicesWithReadings.length} Online`}
+          label="Status Device"
+        />
+        {avgTemp !== null && (
+          <SummaryPill
+            icon={Thermometer}
+            color="#FB923C"
+            value={`${avgTemp.toFixed(1)}°C`}
+            label="Rata-rata Suhu Saat Ini"
+          />
+        )}
+        <SummaryPill
+          icon={CloudRain}
+          color="#22D3EE"
+          value={`${totalRainfall.toFixed(1)} mm`}
+          label="Curah Hujan Terakhir (Total)"
+        />
       </div>
-    </main>
+
+      <SensorCardGrid initialData={devicesWithReadings} />
+    </PageShell>
   );
 }

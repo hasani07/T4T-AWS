@@ -38,7 +38,7 @@ export default function QuotaSettings({
   }
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4">
+    <div className="rounded-2xl border border-slate-200 bg-white p-4">
       <h3 className="text-sm font-semibold text-slate-900">Kapasitas Database</h3>
 
       <div className="mt-3">

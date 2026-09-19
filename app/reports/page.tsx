@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import PageShell from "@/components/PageShell";
 import { getSetting } from "@/lib/settings";
 import ReportsClient from "@/components/reports/ReportsClient";
 import ReportHistory from "@/components/reports/ReportHistory";
@@ -37,8 +38,7 @@ export default async function ReportsPage() {
   ]);
 
   return (
-    <main className="min-h-screen bg-slate-50 px-6 py-10">
-      <div className="mx-auto max-w-5xl">
+    <PageShell>
         <header className="mb-8">
           <h1 className="text-2xl font-semibold text-slate-900">Laporan Mingguan</h1>
           <p className="mt-1 text-sm text-slate-500">
@@ -54,7 +54,6 @@ export default async function ReportsPage() {
 
         <h2 className="mb-3 text-sm font-semibold text-slate-900">Riwayat Laporan</h2>
         <ReportHistory rows={history} />
-      </div>
-    </main>
+    </PageShell>
   );
 }

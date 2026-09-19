@@ -65,7 +65,7 @@ export default function RecommendationsClient() {
       {results && (
         <div className="space-y-3">
           {results.map((r) => (
-            <div key={r.deviceId} className="rounded-xl border border-slate-200 bg-white p-4">
+            <div key={r.deviceId} className="rounded-2xl border border-slate-200 bg-white p-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-slate-900">{r.deviceType}</h3>
                 <RiskBadge level={r.riskLevel} />
