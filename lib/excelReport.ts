@@ -218,7 +218,10 @@ export async function buildExcelReport(params: {
   });
 
   if (chartImageBuffer) {
-    const imageId = workbook.addImage({ buffer: chartImageBuffer, extension: "png" });
+    const imageId = workbook.addImage({
+      buffer: chartImageBuffer as unknown as Buffer,
+      extension: "png",
+    });
     const chartRowStart = 4 + stats.length + 2;
     sheet.addImage(imageId, {
       tl: { col: 0, row: chartRowStart },
