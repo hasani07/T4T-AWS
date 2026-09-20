@@ -6,21 +6,34 @@
 // TERJADWAL lewat pg_cron. Tombol "Generate Manual" di dashboard TETAP
 // pakai endpoint Next.js/Vercel yang sudah ada (tidak berubah).
 //
+// PENTING (revisi): rekomendasi ini dihitung dari AGREGAT 24 JAM
+// TERAKHIR (rata-rata + kondisi terburuk: suhu tertinggi, kelembaban
+// terendah, angin terkencang) — BUKAN cuma snapshot 1 pembacaan terakhir.
+// Ini supaya laporan jam 06:00 pagi tetap menangkap kondisi ekstrem yang
+// mungkin terjadi siang hari sebelumnya, bukan cuma kondisi adem pagi
+// hari saat cron ini jalan.
+//
 // Cara deploy: Supabase Dashboard -> Edge Functions -> Deploy a new
 // function -> Via Editor -> beri nama "generate-recommendation" -> paste
 // seluruh isi file ini -> Deploy.
 //
-// Secrets yang perlu diisi (Project Settings -> Edge Functions -> Secrets,
-// atau lewat CLI `supabase secrets set`):
-//   GROQ_API_KEY, GROQ_MODEL (opsional)
+// Secrets yang perlu diisi (Project Settings -> Edge Functions -> Secrets):
+//   GROQ_API_KEY, GROQ_MODEL (opsional), TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
 // SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY otomatis
 // tersedia di semua Edge Function, tidak perlu diisi manual.
 // =====================================================================
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 
-// ---------- Tipe & konstanta (disalin dari lib/config.ts & lib/types.ts) ----------
+// ---------- Tipe & konstanta ----------
 const CALM_WIND_CODE = "U";
+
+const SANITY_RANGES = {
+  temperature: { min: 10, max: 45 },
+  humidity: { min: 0, max: 100 },
+  wind_speed: { min: 0, max: 40 },
+  rainfall: { min: 0, max: 150 },
+};
 
 interface Device {
   id: number;
@@ -38,14 +51,84 @@ interface SensorReading {
   created_at: string;
 }
 
-// ---------- Kompensasi bug timestamp (disalin dari lib/sensorTimeOffset.ts) ----------
-// Lihat catatan lengkap di lib/deviceStatus.ts pada project Next.js:
-// kolom sensors.created_at diberi label UTC tapi angkanya sudah WIB.
+interface PeriodStats {
+  avgTemperature: number;
+  maxTemperature: number;
+  minTemperature: number;
+  avgHumidity: number;
+  minHumidity: number;
+  maxHumidity: number;
+  avgWindSpeed: number;
+  maxWindSpeed: number;
+  totalRainfall: number;
+  dominantWindDirection: string | null;
+}
+
+// ---------- Kompensasi bug timestamp ----------
+// sensors.created_at diberi label UTC tapi angkanya sudah WIB — lihat
+// catatan lengkap di lib/deviceStatus.ts pada project Next.js.
 function toSensorQueryBoundary(date: Date): string {
   return new Date(date.getTime() + 7 * 60 * 60 * 1000).toISOString();
 }
 
-// ---------- Rule engine (disalin dari lib/rules/ruleEngine.ts) ----------
+function isValidReading(r: SensorReading): boolean {
+  return (
+    r.temperature >= SANITY_RANGES.temperature.min &&
+    r.temperature <= SANITY_RANGES.temperature.max &&
+    r.humidity >= SANITY_RANGES.humidity.min &&
+    r.humidity <= SANITY_RANGES.humidity.max &&
+    r.wind_speed >= SANITY_RANGES.wind_speed.min &&
+    r.wind_speed <= SANITY_RANGES.wind_speed.max &&
+    r.rainfall >= SANITY_RANGES.rainfall.min &&
+    r.rainfall <= SANITY_RANGES.rainfall.max
+  );
+}
+
+/**
+ * Hitung statistik 24 jam terakhir: rata-rata + kondisi terburuk (suhu
+ * tertinggi, kelembaban terendah, angin terkencang) — dipakai untuk
+ * klasifikasi risiko supaya menangkap momen ekstrem, bukan cuma kondisi
+ * pas cron ini jalan (biasanya pagi, yang notabene lagi adem).
+ */
+function computeStats(readings: SensorReading[]): PeriodStats | null {
+  const valid = readings.filter(isValidReading);
+  if (valid.length === 0) return null;
+
+  const avg = (arr: number[]) => arr.reduce((s, v) => s + v, 0) / arr.length;
+  const temps = valid.map((r) => r.temperature);
+  const hums = valid.map((r) => r.humidity);
+  const winds = valid.map((r) => r.wind_speed);
+  const rains = valid.map((r) => r.rainfall);
+
+  const directionCounts: Record<string, number> = {};
+  for (const r of valid) {
+    if (r.wind_direction === CALM_WIND_CODE) continue;
+    directionCounts[r.wind_direction] = (directionCounts[r.wind_direction] ?? 0) + 1;
+  }
+  let dominantWindDirection: string | null = null;
+  let maxCount = 0;
+  for (const [dir, count] of Object.entries(directionCounts)) {
+    if (count > maxCount) {
+      maxCount = count;
+      dominantWindDirection = dir;
+    }
+  }
+
+  return {
+    avgTemperature: avg(temps),
+    maxTemperature: Math.max(...temps),
+    minTemperature: Math.min(...temps),
+    avgHumidity: avg(hums),
+    minHumidity: Math.min(...hums),
+    maxHumidity: Math.max(...hums),
+    avgWindSpeed: avg(winds),
+    maxWindSpeed: Math.max(...winds),
+    totalRainfall: rains.reduce((s, v) => s + v, 0),
+    dominantWindDirection,
+  };
+}
+
+// ---------- Rule engine ----------
 type RiskLevel = "aman" | "waspada" | "kritis";
 type VpdClass = "rendah" | "sedang" | "tinggi";
 
@@ -61,35 +144,41 @@ function classifyVPD(vpd: number): VpdClass {
   return "tinggi";
 }
 
-function classifyRisk(temperature: number, humidity: number, windSpeed: number) {
-  const isHotDry = temperature > 33 && humidity < 55;
-  const isModerateHot = temperature > 32 || humidity < 60;
-  const isStrongWind = windSpeed > 8;
+/**
+ * Klasifikasi risiko berdasarkan KONDISI TERBURUK dalam 24 jam terakhir
+ * (suhu tertinggi, kelembaban terendah, angin terkencang) — bukan
+ * rata-rata, supaya momen ekstrem sesaat tetap ke-flag walau cuma
+ * terjadi beberapa jam.
+ */
+function classifyRisk(maxTemp: number, minHum: number, maxWind: number) {
+  const isHotDry = maxTemp > 33 && minHum < 55;
+  const isModerateHot = maxTemp > 32 || minHum < 60;
+  const isStrongWind = maxWind > 8;
 
   let level: RiskLevel = "aman";
   if (isHotDry) level = "kritis";
   else if (isModerateHot) level = "waspada";
 
-  if (isStrongWind && temperature > 30 && level !== "kritis") {
+  if (isStrongWind && maxTemp > 30 && level !== "kritis") {
     level = level === "aman" ? "waspada" : "kritis";
   }
 
   const explanations: Record<RiskLevel, string> = {
-    aman: "Kondisi suhu, kelembaban, dan angin dalam rentang yang cukup baik untuk pertumbuhan bibit.",
+    aman: "Kondisi suhu, kelembaban, dan angin dalam 24 jam terakhir masih dalam rentang yang cukup baik untuk pertumbuhan bibit.",
     waspada:
-      "Ada indikasi beban termal/pengeringan meningkat — perlu pemantauan lebih ketat.",
+      "Ada momen dengan beban termal/pengeringan meningkat dalam 24 jam terakhir — perlu pemantauan lebih ketat.",
     kritis:
-      "Kombinasi suhu tinggi, kelembaban rendah, dan/atau angin kencang berisiko mempercepat kekeringan media dan stres air pada bibit.",
+      "Terjadi momen dengan kombinasi suhu tinggi, kelembaban rendah, dan/atau angin kencang dalam 24 jam terakhir — berisiko mempercepat kekeringan media dan stres air pada bibit.",
   };
 
   return { level, explanation: explanations[level] };
 }
 
-function buildWindNote(windDirection: string): string {
-  if (windDirection === CALM_WIND_CODE) {
-    return "Angin dalam kondisi calm/tidak terdeteksi arah dominan pada periode ini.";
+function buildWindNote(dominantDirection: string | null): string {
+  if (!dominantDirection) {
+    return "Angin dominan dalam 24 jam terakhir cenderung calm/tidak terdeteksi arahnya.";
   }
-  return `Angin dominan dari arah ${windDirection}. Pertimbangkan posisi windbreak di sisi ini kalau kondisinya berlangsung konsisten.`;
+  return `Angin dominan dari arah ${dominantDirection} dalam 24 jam terakhir. Pertimbangkan posisi windbreak di sisi ini kalau berlangsung konsisten.`;
 }
 
 function buildRainfallNote(rainfallTotal: number): string {
@@ -99,7 +188,7 @@ function buildRainfallNote(rainfallTotal: number): string {
   return `Curah hujan minim (${rainfallTotal.toFixed(1)} mm) dalam 24 jam terakhir — pertimbangkan kebutuhan irigasi tambahan kalau kondisi kering berlanjut.`;
 }
 
-// ---------- Groq (disalin dari lib/groq.ts, pakai Deno.env) ----------
+// ---------- Groq ----------
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
 const DEFAULT_MODEL = "openai/gpt-oss-120b";
 
@@ -109,18 +198,14 @@ const SYSTEM_PROMPT = `Kamu adalah asisten ahli mikroklimat persemaian, memberi 
 - Suhu 28-32°C, RH 60-75%, angin lemah-sedang = risiko sedang/cukup baik: cukup pantau media & gejala layu sore hari.
 - RH sangat tinggi + suhu sedang: buka sebagian naungan/tingkatkan ventilasi supaya tidak memicu jamur, tapi jaga media tidak terlalu kering.
 - Arah angin dominan menentukan sisi mana perlu windbreak (dari area terbuka/kering = risiko tinggi, dari area bervegetasi = risiko rendah). Jangan berikan saran windbreak kalau kondisi angin calm/tidak terdeteksi.
-- VPD <0.8 kPa = lembap/transpirasi rendah; 0.8-1.5 kPa = seimbang; >1.5 kPa = kering, risiko stres air tinggi -> indikasi kebutuhan penyiraman ekstra (proksi hari ber-ETo tinggi kalau dikombinasikan dengan panas & angin).
+- VPD <0.8 kPa = lembap/transpirasi rendah; 0.8-1.5 kPa = seimbang; >1.5 kPa = kering, risiko stres air tinggi -> indikasi kebutuhan penyiraman ekstra.
 - Curah hujan tinggi pada periode terakhir bisa menurunkan urgensi irigasi tambahan meskipun suhu/RH menunjukkan waspada.
 
-Tugasmu: berdasarkan data numerik dan hasil klasifikasi yang sudah dihitung (jangan dihitung ulang, anggap benar), tulis rekomendasi tindakan singkat, actionable, dalam Bahasa Indonesia (3-5 kalimat atau beberapa poin) untuk pengelola persemaian di lokasi tersebut. Fokus ke tindakan konkret, jangan mengulang-ulang angka mentah.`;
+Kamu akan diberi data RINGKASAN 24 JAM TERAKHIR (bukan cuma 1 titik), termasuk kondisi rata-rata DAN kondisi terburuk (suhu tertinggi, kelembaban terendah, angin terkencang) yang terjadi dalam periode itu. Tugasmu: tulis rekomendasi tindakan singkat, actionable, dalam Bahasa Indonesia (3-5 kalimat atau beberapa poin) untuk pengelola persemaian, yang mempertimbangkan KEDUA kondisi itu (jangan cuma fokus ke rata-rata kalau ada momen ekstrem yang perlu diwaspadai). Jangan menghitung ulang angka — anggap semua angka & klasifikasi yang diberikan sudah benar. Fokus ke tindakan konkret.`;
 
 interface RecommendationParams {
   deviceLabel: string;
-  temperature: number;
-  humidity: number;
-  windSpeed: number;
-  windDirection: string;
-  rainfallTotal: number;
+  stats: PeriodStats;
   vpd: number;
   vpdClass: string;
   riskLevel: string;
@@ -130,18 +215,19 @@ interface RecommendationParams {
 }
 
 function buildUserPrompt(p: RecommendationParams): string {
-  return `Data mikroklimat lokasi ${p.deviceLabel}:
-- Suhu: ${p.temperature.toFixed(1)} °C
-- Kelembaban (RH): ${p.humidity.toFixed(0)} %
-- Kecepatan Angin: ${p.windSpeed.toFixed(1)} m/s
-- Arah Angin: ${p.windDirection}
-- Curah Hujan (24 jam terakhir): ${p.rainfallTotal.toFixed(1)} mm
-- VPD: ${p.vpd.toFixed(2)} kPa (kelas: ${p.vpdClass})
-- Klasifikasi risiko (sudah dihitung sistem): ${p.riskLevel} — ${p.riskExplanation}
+  const s = p.stats;
+  return `Ringkasan 24 jam terakhir lokasi ${p.deviceLabel}:
+- Suhu: rata-rata ${s.avgTemperature.toFixed(1)}°C, TERTINGGI ${s.maxTemperature.toFixed(1)}°C, terendah ${s.minTemperature.toFixed(1)}°C
+- Kelembaban (RH): rata-rata ${s.avgHumidity.toFixed(0)}%, TERENDAH ${s.minHumidity.toFixed(0)}%, tertinggi ${s.maxHumidity.toFixed(0)}%
+- Kecepatan Angin: rata-rata ${s.avgWindSpeed.toFixed(1)} m/s, TERKENCANG ${s.maxWindSpeed.toFixed(1)} m/s
+- Total Curah Hujan: ${s.totalRainfall.toFixed(1)} mm
+- Arah angin dominan: ${s.dominantWindDirection ?? "calm/tidak terdeteksi"}
+- VPD (dari rata-rata): ${p.vpd.toFixed(2)} kPa (kelas: ${p.vpdClass})
+- Klasifikasi risiko (dari KONDISI TERBURUK, sudah dihitung sistem): ${p.riskLevel} — ${p.riskExplanation}
 - Catatan angin: ${p.windNote}
 - Catatan curah hujan: ${p.rainfallNote}
 
-Tulis rekomendasi tindakan untuk pengelola persemaian di lokasi ini.`;
+Tulis rekomendasi tindakan untuk pengelola persemaian di lokasi ini, dengan mempertimbangkan baik kondisi rata-rata maupun kondisi terburuk di atas.`;
 }
 
 async function generateRecommendationText(params: RecommendationParams): Promise<string> {
@@ -178,6 +264,58 @@ async function generateRecommendationText(params: RecommendationParams): Promise
   return text.trim();
 }
 
+// ---------- Telegram ----------
+const TELEGRAM_API = "https://api.telegram.org";
+
+async function sendTelegramMessage(text: string) {
+  const token = Deno.env.get("TELEGRAM_BOT_TOKEN");
+  const chatId = Deno.env.get("TELEGRAM_CHAT_ID");
+  if (!token || !chatId) {
+    console.error("TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID belum diisi, skip kirim Telegram.");
+    return;
+  }
+  const res = await fetch(`${TELEGRAM_API}/bot${token}/sendMessage`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML" }),
+  });
+  const data = await res.json();
+  if (!data.ok) console.error("Telegram sendMessage error:", data);
+}
+
+const RISK_EMOJI: Record<RiskLevel, string> = {
+  aman: "✅",
+  waspada: "⚠️",
+  kritis: "🚨",
+};
+
+interface DeviceResult {
+  deviceId: number;
+  deviceType: string;
+  riskLevel: RiskLevel;
+  vpd: number;
+  stats: PeriodStats;
+  recommendationText: string;
+}
+
+function buildTelegramSummary(results: DeviceResult[]): string {
+  const DIVIDER = "━━━━━━━━━━━━━━━";
+  const header = `🌤️ <b>Rekomendasi AI Harian — AWS T4T</b>\n📅 Ringkasan 24 jam terakhir`;
+  const blocks = results.map((r) => {
+    const s = r.stats;
+    return (
+      `📍 <b>${r.deviceType}</b>\n` +
+      `${RISK_EMOJI[r.riskLevel]} Status: <b>${r.riskLevel.toUpperCase()}</b> · VPD: ${r.vpd.toFixed(2)} kPa\n` +
+      `🌡️ Suhu: rata-rata ${s.avgTemperature.toFixed(1)}°C (tertinggi ${s.maxTemperature.toFixed(1)}°C)\n` +
+      `💧 Kelembaban: rata-rata ${s.avgHumidity.toFixed(0)}% (terendah ${s.minHumidity.toFixed(0)}%)\n` +
+      `🌬️ Angin: rata-rata ${s.avgWindSpeed.toFixed(1)} m/s (terkencang ${s.maxWindSpeed.toFixed(1)} m/s)\n` +
+      `🌧️ Curah Hujan: ${s.totalRainfall.toFixed(1)} mm\n\n` +
+      `${r.recommendationText}`
+    );
+  });
+  return [header, DIVIDER, blocks.join(`\n${DIVIDER}\n`), DIVIDER].join("\n");
+}
+
 // ---------- Handler utama ----------
 Deno.serve(async (_req: Request) => {
   try {
@@ -197,54 +335,42 @@ Deno.serve(async (_req: Request) => {
       throw new Error("Gagal mengambil daftar devices.");
     }
 
-    const results = [];
+    const results: DeviceResult[] = [];
 
     for (const device of devices as Device[]) {
-      const { data: latestRows, error: latestError } = await supabaseRead
+      const since = toSensorQueryBoundary(new Date(Date.now() - 24 * 60 * 60 * 1000));
+      const { data: readings, error: readError } = await supabaseRead
         .from("sensors")
         .select("*")
         .eq("device_id", device.id)
-        .order("created_at", { ascending: false })
-        .limit(1);
+        .gte("created_at", since)
+        .order("created_at", { ascending: true })
+        .limit(5000);
 
-      if (latestError) {
-        console.error(`Gagal ambil data sensor device ${device.id}:`, latestError);
+      if (readError) {
+        console.error(`Gagal ambil data sensor device ${device.id}:`, readError);
         continue;
       }
 
-      const latest =
-        latestRows && latestRows.length > 0 ? (latestRows[0] as SensorReading) : null;
-      if (!latest) continue;
+      const stats = computeStats((readings ?? []) as SensorReading[]);
+      if (!stats) {
+        console.log(`Tidak ada data valid 24 jam terakhir untuk device ${device.id}, skip.`);
+        continue;
+      }
 
-      const since = toSensorQueryBoundary(new Date(Date.now() - 24 * 60 * 60 * 1000));
-      const { data: rainRows } = await supabaseRead
-        .from("sensors")
-        .select("rainfall")
-        .eq("device_id", device.id)
-        .gte("created_at", since);
-
-      const rainfallTotal = (rainRows ?? []).reduce(
-        (sum: number, r: { rainfall: number }) => sum + (r.rainfall ?? 0),
-        0
-      );
-
-      const vpd = calcVPD(latest.temperature, latest.humidity);
+      const vpd = calcVPD(stats.avgTemperature, stats.avgHumidity);
       const vpdClass = classifyVPD(vpd);
       const { level, explanation } = classifyRisk(
-        latest.temperature,
-        latest.humidity,
-        latest.wind_speed
+        stats.maxTemperature,
+        stats.minHumidity,
+        stats.maxWindSpeed
       );
-      const windNote = buildWindNote(latest.wind_direction);
-      const rainfallNote = buildRainfallNote(rainfallTotal);
+      const windNote = buildWindNote(stats.dominantWindDirection);
+      const rainfallNote = buildRainfallNote(stats.totalRainfall);
 
       const recommendationText = await generateRecommendationText({
         deviceLabel: device.type,
-        temperature: latest.temperature,
-        humidity: latest.humidity,
-        windSpeed: latest.wind_speed,
-        windDirection: latest.wind_direction,
-        rainfallTotal,
+        stats,
         vpd,
         vpdClass,
         riskLevel: level,
@@ -257,11 +383,16 @@ Deno.serve(async (_req: Request) => {
         device_id: device.id,
         trigger_type: "scheduled",
         input_summary: {
-          temperature: latest.temperature,
-          humidity: latest.humidity,
-          wind_speed: latest.wind_speed,
-          wind_direction: latest.wind_direction,
-          rainfall_24h: rainfallTotal,
+          avg_temperature: stats.avgTemperature,
+          max_temperature: stats.maxTemperature,
+          min_temperature: stats.minTemperature,
+          avg_humidity: stats.avgHumidity,
+          min_humidity: stats.minHumidity,
+          max_humidity: stats.maxHumidity,
+          avg_wind_speed: stats.avgWindSpeed,
+          max_wind_speed: stats.maxWindSpeed,
+          total_rainfall_24h: stats.totalRainfall,
+          dominant_wind_direction: stats.dominantWindDirection,
           vpd,
           vpd_class: vpdClass,
           risk_level: level,
@@ -278,8 +409,17 @@ Deno.serve(async (_req: Request) => {
         deviceType: device.type,
         riskLevel: level,
         vpd,
+        stats,
         recommendationText,
       });
+    }
+
+    if (results.length > 0) {
+      try {
+        await sendTelegramMessage(buildTelegramSummary(results));
+      } catch (telegramErr) {
+        console.error("Gagal kirim ringkasan ke Telegram:", telegramErr);
+      }
     }
 
     return new Response(JSON.stringify({ success: true, results }), {
