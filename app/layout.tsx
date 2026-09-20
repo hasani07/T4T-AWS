@@ -5,7 +5,29 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "AWS T4T — Dashboard Monitoring Mikroklimat",
-  description: "Dashboard monitoring sensor cuaca mikroklimat persemaian (Workshop T4T)",
+  description:
+    "Dashboard monitoring sensor cuaca mikroklimat persemaian (Workshop T4T) — suhu, kelembaban, angin, curah hujan real-time, AI recommendation, dan laporan otomatis.",
+  openGraph: {
+    title: "AWS T4T — Dashboard Monitoring Mikroklimat",
+    description:
+      "Monitoring cuaca real-time, AI recommendation, dan laporan otomatis untuk persemaian.",
+    siteName: "AWS T4T",
+    locale: "id_ID",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "AWS T4T — Dashboard Monitoring Mikroklimat",
+    description:
+      "Monitoring cuaca real-time, AI recommendation, dan laporan otomatis untuk persemaian.",
+  },
+  icons: {
+    icon: [
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 export default function RootLayout({

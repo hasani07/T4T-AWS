@@ -538,3 +538,54 @@ data statis lokasi fisik alat).
   fresh setiap kali halaman itu **dibuka/dinavigasi ulang** (server-side,
   `revalidate = 0`), tapi belum auto-refresh berkala kalau dibiarkan
   terbuka lama tanpa berpindah halaman.
+
+## Fitur Tambahan: PWA (Add to Home Screen)
+
+Sekarang dashboard bisa "di-install" ke home screen HP seperti aplikasi
+native — lewat `app/manifest.ts` (konvensi Next.js, otomatis di-link) +
+icon di `public/icon-192.png`, `public/icon-512.png`,
+`public/apple-touch-icon.png`. Di Android/Chrome biasanya muncul prompt
+"Add to Home Screen" otomatis; di iOS/Safari, buka menu Share → "Add to
+Home Screen".
+
+## Fitur Tambahan: SEO / Preview Link (Open Graph)
+
+Link dashboard sekarang punya preview yang layak kalau di-share ke
+Telegram/WhatsApp — gambar preview di `app/opengraph-image.png` (dideteksi
+otomatis oleh Next.js), plus metadata title/description lengkap di
+`app/layout.tsx`.
+
+## Fitur Tambahan: Kartu VPD
+
+Tiap kartu sensor di Dashboard sekarang juga menampilkan **VPD (Vapor
+Pressure Deficit)** — dihitung dari suhu & kelembaban real-time
+(`lib/rules/ruleEngine.ts` → `calcVPD`/`classifyVPD`, sama seperti yang
+dipakai AI Recommendation), dengan warna berbeda tergantung kelasnya
+(hijau=rendah, kuning=sedang, merah=tinggi).
+
+## Fitur Tambahan: Alert Real-time (Kritis)
+
+Selain AI Recommendation yang jalan 1x/hari, sekarang ada lapisan kedua:
+begitu ada data sensor BARU masuk dan kondisinya masuk kategori
+**KRITIS** (suhu tinggi + kelembaban rendah), **langsung** kirim alert ke
+Telegram saat itu juga — tidak perlu nunggu sampai laporan harian.
+
+### Setup
+
+1. **Deploy Edge Function** `realtime-alert-check` (Supabase Dashboard →
+   Edge Functions → Deploy a new function → Via Editor → nama persis
+   `realtime-alert-check` → paste isi
+   `supabase/functions/realtime-alert-check/index.ts`).
+2. **Matikan "Enforce JWT Verification"** untuk function ini (sama seperti
+   `telegram-webhook`).
+3. **Tambahkan secret** `REALTIME_ALERT_SECRET` di Edge Function Secrets.
+4. **Buat Database Webhook**: Supabase Dashboard → Database → Webhooks →
+   Create a new webhook:
+   - Name: `realtime-critical-alert`
+   - Table: `sensors`
+   - Events: **Insert** saja
+   - Type: HTTP Request
+   - URL: `https://<PROJECT_REF>.supabase.co/functions/v1/realtime-alert-check`
+   - HTTP Headers: tambahkan `x-realtime-alert-secret: <isi sesuai REALTIME_ALERT_SECRET>`
+5. Tidak perlu jadwal cron apapun — ini murni event-driven, jalan
+   otomatis setiap ada INSERT baru ke `sensors`.

@@ -1,8 +1,21 @@
 import { DeviceWithLatestReading } from "@/lib/types";
 import { WIND_DIRECTION_LABELS } from "@/lib/config";
 import { isDeviceOnline, formatRelativeTime, formatDateTime } from "@/lib/deviceStatus";
+import { calcVPD, classifyVPD } from "@/lib/rules/ruleEngine";
 import StatusBadge from "./StatusBadge";
-import { Thermometer, Droplets, Wind, CloudRain, Compass, LucideIcon } from "lucide-react";
+import { Thermometer, Droplets, Wind, CloudRain, Compass, Gauge, LucideIcon } from "lucide-react";
+
+const VPD_CLASS_LABEL: Record<string, string> = {
+  rendah: "Rendah",
+  sedang: "Sedang",
+  tinggi: "Tinggi",
+};
+
+const VPD_CLASS_COLOR: Record<string, string> = {
+  rendah: "#22C55E",
+  sedang: "#F59E0B",
+  tinggi: "#EF4444",
+};
 
 function MetricPill({
   icon: Icon,
@@ -42,6 +55,9 @@ export default function SensorCard({
     ? WIND_DIRECTION_LABELS[latest.wind_direction] ?? latest.wind_direction
     : "-";
 
+  const vpd = latest ? calcVPD(latest.temperature, latest.humidity) : null;
+  const vpdClass = vpd !== null ? classifyVPD(vpd) : null;
+
   return (
     <div className="rounded-3xl bg-white p-5 shadow-[0_2px_24px_rgba(15,23,42,0.06)]">
       <div className="flex items-start justify-between">
@@ -78,13 +94,21 @@ export default function SensorCard({
             />
           </div>
 
-          <div className="mt-2.5">
+          <div className="mt-2.5 grid grid-cols-2 gap-2.5">
             <MetricPill
               icon={CloudRain}
               color="#22D3EE"
               value={`${latest.rainfall.toFixed(1)} mm`}
               label="Curah Hujan"
             />
+            {vpd !== null && vpdClass && (
+              <MetricPill
+                icon={Gauge}
+                color={VPD_CLASS_COLOR[vpdClass]}
+                value={`${vpd.toFixed(2)} kPa`}
+                label={`VPD (${VPD_CLASS_LABEL[vpdClass]})`}
+              />
+            )}
           </div>
 
           <p className="mt-4 text-xs text-slate-400">
