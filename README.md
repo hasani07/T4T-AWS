@@ -589,3 +589,46 @@ Telegram saat itu juga — tidak perlu nunggu sampai laporan harian.
    - HTTP Headers: tambahkan `x-realtime-alert-secret: <isi sesuai REALTIME_ALERT_SECRET>`
 5. Tidak perlu jadwal cron apapun — ini murni event-driven, jalan
    otomatis setiap ada INSERT baru ke `sensors`.
+
+## Perubahan Besar: Interval Akuisisi Data Sesuai Standar WMO
+
+Firmware device sekarang mengirim hasil **rata-rata tiap 5 menit**
+langsung (BUKAN data mentah tiap 1 menit — sempat ada asumsi salah soal
+ini di iterasi sebelumnya, sudah dikoreksi). Jadi web/dashboard TIDAK
+perlu menghitung ulang rata-rata apapun — tinggal ambil apa adanya,
+persis seperti pendekatan sebelumnya waktu interval masih 1 jam, cuma
+sekarang datanya jauh lebih rapat (tiap 5 menit, bukan tiap jam).
+
+Window 5 menit ini sudah sesuai standar WMO (rentang rata-rata 1-10
+menit untuk suhu/kelembaban/curah hujan). Perhitungan cara averaging
+untuk masing-masing parameter (arah angin pakai modus/vector, curah
+hujan diakumulasi, dsb) jadi tanggung jawab firmware — pastikan tim
+firmware sudah menerapkan itu di sisi alat.
+
+### File yang Berubah
+
+- `lib/config.ts` — `OFFLINE_THRESHOLD_MINUTES` diperpendek dari 90 ke
+  **15 menit** (3x interval kirim baru 5 menit, kasih buffer wajar)
+- `app/page.tsx`, `components/SensorCardGrid.tsx` — tetap ambil 1 baris
+  terakhir apa adanya (tidak berubah logic-nya, cuma datanya lebih rapat)
+- `lib/statsEngine.ts` — **paginasi diperbaiki** (kritis!): sebelumnya
+  limit tetap 5000 baris. Dengan interval 5 menit, 30 hari = ~8.640
+  baris/device — sudah melebihi limit lama, jadi tanpa perbaikan ini
+  Analitik & Export Excel bisa kepotong diam-diam untuk rentang panjang.
+- `lib/recommendationEngine.ts` — limit query curah hujan 24 jam
+  dinaikkan (jaga-jaga, 288 baris/hari dengan interval 5 menit)
+- `supabase/functions/weekly-report/index.ts`,
+  `supabase/functions/telegram-webhook/index.ts` — paginasi diperbaiki
+  (laporan mingguan/bulanan & command `/laporan` custom range bisa minta
+  rentang yang totalnya melebihi limit lama)
+- `supabase/functions/realtime-alert-check/index.ts` — TETAP cek 1 baris
+  langsung (karena sudah representatif dari firmware), tapi ditambah
+  **cooldown 30 menit** per device supaya tidak spam kalau kondisi kritis
+  berlangsung lama (tanpa ini, interval kirim 5 menit bisa berarti alert
+  baru tiap 5 menit terus-menerus selama kondisi masih kritis)
+
+### Yang TIDAK Perlu Diubah
+
+`generate-recommendation` (rekomendasi AI harian) sudah lebih dulu
+dirombak jadi berbasis agregat 24 jam — otomatis tetap benar dengan
+volume data yang lebih rapat, tidak perlu disentuh lagi.

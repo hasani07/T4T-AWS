@@ -25,26 +25,44 @@ export interface PeriodStats {
 /**
  * Ambil data sensor mentah dari Supabase untuk 1 device dalam rentang
  * tanggal tertentu. Read-only — tidak pernah menulis apapun.
+ *
+ * PENTING: pakai PAGINATION (bukan limit tetap). Sejak device kirim data
+ * mentah tiap 1 menit, rentang 30 hari bisa berisi puluhan ribu baris
+ * (jauh melebihi batas 1000-5000 baris per query Supabase) — tanpa
+ * paginasi, data akan KEPOTONG DIAM-DIAM dan bikin Analitik/Excel salah
+ * hitung tanpa ada error yang kelihatan.
  */
 export async function fetchReadings(
   deviceId: number,
   range: DateRange
 ): Promise<SensorReading[]> {
-  const { data, error } = await supabase
-    .from("sensors")
-    .select("*")
-    .eq("device_id", deviceId)
-    .gte("created_at", toSensorQueryBoundary(range.start))
-    .lt("created_at", toSensorQueryBoundary(range.end))
-    .order("created_at", { ascending: true })
-    .limit(5000);
+  const PAGE_SIZE = 1000;
+  const all: SensorReading[] = [];
+  let from = 0;
 
-  if (error) {
-    console.error("Gagal mengambil data sensor untuk analitik:", error);
-    return [];
+  while (true) {
+    const { data, error } = await supabase
+      .from("sensors")
+      .select("*")
+      .eq("device_id", deviceId)
+      .gte("created_at", toSensorQueryBoundary(range.start))
+      .lt("created_at", toSensorQueryBoundary(range.end))
+      .order("created_at", { ascending: true })
+      .range(from, from + PAGE_SIZE - 1);
+
+    if (error) {
+      console.error("Gagal mengambil data sensor untuk analitik:", error);
+      break;
+    }
+    if (!data || data.length === 0) break;
+
+    all.push(...data);
+
+    if (data.length < PAGE_SIZE) break; // halaman terakhir
+    from += PAGE_SIZE;
   }
 
-  return data ?? [];
+  return all;
 }
 
 function isValidReading(r: SensorReading): boolean {

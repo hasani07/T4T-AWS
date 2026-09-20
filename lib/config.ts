@@ -1,5 +1,8 @@
-// Sesuai PRD Bagian 6 & 13: threshold offline final = 90 menit
-// (1.5x interval normal kirim data device, yaitu 1 jam sekali)
+// PENDING: masih 90 menit (sesuai interval kirim SEKARANG yang masih
+// 1 jam). JANGAN diubah ke 15 menit sampai firmware BENERAN sudah mulai
+// kirim tiap 5 menit — kalau diubah duluan, status Online/Offline bakal
+// salah terus (device asli online tapi keliatan "Offline" karena
+// nunggu jadwal kirim jam berikutnya).
 export const OFFLINE_THRESHOLD_MINUTES = 90;
 
 // Sesuai PRD Bagian 9.4: kategori "U" pada wind_direction dikonfirmasi

@@ -402,15 +402,27 @@ async function processReportRequest(chatId: number | string, range: DateRange) {
   if (devicesError || !devices) throw new Error("Gagal mengambil daftar devices.");
 
   async function fetchReadings(deviceId: number, r: DateRange): Promise<SensorReading[]> {
-    const { data, error } = await supabase
-      .from("sensors").select("*")
-      .eq("device_id", deviceId)
-      .gte("created_at", toSensorQueryBoundary(r.start))
-      .lt("created_at", toSensorQueryBoundary(r.end))
-      .order("created_at", { ascending: true })
-      .limit(5000);
-    if (error) { console.error(error); return []; }
-    return data ?? [];
+    // Paginasi beneran — device kirim data mentah tiap 1 menit, jadi
+    // rentang yang diminta lewat /laporan (bisa sampai 365 hari) perlu
+    // di-loop, bukan limit tetap yang bisa kepotong diam-diam.
+    const PAGE_SIZE = 1000;
+    const all: SensorReading[] = [];
+    let from = 0;
+    while (true) {
+      const { data, error } = await supabase
+        .from("sensors").select("*")
+        .eq("device_id", deviceId)
+        .gte("created_at", toSensorQueryBoundary(r.start))
+        .lt("created_at", toSensorQueryBoundary(r.end))
+        .order("created_at", { ascending: true })
+        .range(from, from + PAGE_SIZE - 1);
+      if (error) { console.error(error); break; }
+      if (!data || data.length === 0) break;
+      all.push(...data);
+      if (data.length < PAGE_SIZE) break;
+      from += PAGE_SIZE;
+    }
+    return all;
   }
 
   async function getLatestRecommendation(deviceId: number): Promise<string | null> {

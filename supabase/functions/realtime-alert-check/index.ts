@@ -7,10 +7,12 @@
 // — pakai rule yang sama seperti AI Recommendation), langsung kirim
 // alert ke Telegram saat itu juga.
 //
-// Ini BEDA dari generate-recommendation (yang jalan 1x/hari terjadwal):
-// fungsi ini jalan tiap kali ada data baru, tapi cuma actually ngirim
-// pesan kalau kondisinya kritis (supaya tidak spam tiap jam kalau
-// kondisinya aman-aman saja).
+// REVISI: firmware mengirim hasil rata-rata 5 menit langsung (bukan data
+// mentah per menit) — jadi 1 baris yang baru masuk SUDAH representatif,
+// tidak perlu dirata-ratakan ulang di sini. Yang ditambahkan cuma
+// COOLDOWN 30 menit per device supaya tidak spam kalau kondisi kritis
+// berkepanjangan (tanpa cooldown ini, kondisi kritis yang bertahan lama
+// bisa memicu alert tiap 5 menit terus-menerus).
 //
 // Cara deploy:
 //   1. Supabase Dashboard -> Edge Functions -> Deploy a new function ->
@@ -42,6 +44,8 @@ interface SensorRecord {
   created_at: string;
 }
 
+const ALERT_COOLDOWN_MINUTES = 30; // jeda minimum antar alert per device
+
 // Rentang nilai wajar (sama seperti lib/config.ts di Next.js) — dipakai
 // untuk MENYARING data glitch/anomali (mis. saat device baru restart dan
 // sempat kirim angka ngaco) supaya tidak memicu alert palsu.
@@ -64,6 +68,10 @@ function isValidReading(r: SensorRecord): boolean {
     r.rainfall <= SANITY_RANGES.rainfall.max
   );
 }
+
+// sensors.created_at diberi label UTC tapi angkanya sudah WIB — lihat
+// catatan lengkap di lib/deviceStatus.ts pada project Next.js. Dicatat
+// di sini untuk referensi meski tidak dipakai langsung di file ini lagi.
 
 const TELEGRAM_API = "https://api.telegram.org";
 
@@ -115,6 +123,8 @@ Deno.serve(async (req: Request) => {
       return new Response("ok"); // payload tidak sesuai ekspektasi, abaikan
     }
 
+    // Firmware sudah kirim hasil rata-rata 5 menit — jadi 1 baris ini
+    // SUDAH representatif, tidak perlu dirata-ratakan lagi di sini.
     if (!isValidReading(record)) {
       console.log("Data di luar rentang wajar, kemungkinan glitch — alert dilewati.", record);
       return new Response("ok");
@@ -128,9 +138,31 @@ Deno.serve(async (req: Request) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const supabase = createClient(supabaseUrl, anonKey);
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseRead = createClient(supabaseUrl, anonKey);
+    const supabaseWrite = createClient(supabaseUrl, serviceRoleKey);
 
-    const { data: device } = await supabase
+    // Cek cooldown supaya tidak spam kalau kondisi kritis berkepanjangan
+    // (dengan kirim tiap 5 menit, tanpa ini bisa alert tiap 5 menit terus).
+    const cooldownKey = `last_critical_alert_${record.device_id}`;
+    const { data: cooldownSetting } = await supabaseRead
+      .from("settings")
+      .select("value")
+      .eq("key", cooldownKey)
+      .maybeSingle();
+
+    const lastAlertAt = cooldownSetting?.value ? new Date(String(cooldownSetting.value)) : null;
+    if (lastAlertAt) {
+      const minutesSinceLastAlert = (Date.now() - lastAlertAt.getTime()) / 60000;
+      if (minutesSinceLastAlert < ALERT_COOLDOWN_MINUTES) {
+        console.log(
+          `Masih dalam cooldown (${minutesSinceLastAlert.toFixed(1)} menit lalu), alert dilewati.`
+        );
+        return new Response("ok");
+      }
+    }
+
+    const { data: device } = await supabaseRead
       .from("devices")
       .select("type")
       .eq("id", record.device_id)
@@ -144,8 +176,13 @@ Deno.serve(async (req: Request) => {
         `🌡️ Suhu: <b>${record.temperature.toFixed(1)}°C</b>\n` +
         `💧 Kelembaban: <b>${record.humidity.toFixed(0)}%</b>\n` +
         `🌬️ Angin: <b>${record.wind_speed.toFixed(1)} m/s</b>\n\n` +
-        `Kombinasi suhu tinggi + kelembaban rendah berisiko mempercepat kekeringan media & stres air pada bibit. Segera cek kondisi lapangan.`
+        `Kombinasi suhu tinggi + kelembaban rendah berisiko mempercepat kekeringan media & stres air pada bibit. Segera cek kondisi lapangan.\n\n` +
+        `<i>Alert berikutnya untuk lokasi ini paling cepat ${ALERT_COOLDOWN_MINUTES} menit lagi kalau kondisi masih kritis.</i>`
     );
+
+    await supabaseWrite
+      .from("settings")
+      .upsert({ key: cooldownKey, value: new Date().toISOString() });
 
     return new Response("ok");
   } catch (err) {

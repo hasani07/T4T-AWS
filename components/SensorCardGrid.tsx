@@ -27,7 +27,9 @@ export default function SensorCardGrid({
 
   useEffect(() => {
     // Subscribe ke INSERT baru di tabel `sensors` — hanya mendengarkan
-    // (read), tidak pernah menulis apapun ke database.
+    // (read), tidak pernah menulis apapun ke database. Firmware sudah
+    // kirim hasil rata-rata 5 menit, jadi payload.new dipakai apa adanya
+    // tanpa perlu dihitung ulang di sisi web.
     const channel = supabase
       .channel("sensors-realtime")
       .on(

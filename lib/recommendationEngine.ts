@@ -41,7 +41,10 @@ async function getRainfallSum24h(deviceId: number): Promise<number> {
     .from("sensors")
     .select("rainfall")
     .eq("device_id", deviceId)
-    .gte("created_at", since);
+    .gte("created_at", since)
+    // Interval kirim device sekarang 1 menit -> 24 jam bisa ~1440 baris,
+    // melebihi batas default Supabase (1000) kalau tidak di-limit eksplisit.
+    .limit(2000);
   if (error || !data) return 0;
   return data.reduce((sum, r) => sum + (r.rainfall ?? 0), 0);
 }

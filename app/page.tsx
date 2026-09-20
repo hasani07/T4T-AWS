@@ -26,6 +26,9 @@ async function getDevicesWithLatestReadings(): Promise<DeviceWithLatestReading[]
   const results: DeviceWithLatestReading[] = [];
 
   for (const device of devices) {
+    // Firmware SUDAH mengirim hasil rata-rata 5 menit (bukan data mentah
+    // per menit) — jadi kita ambil 1 baris terakhir apa adanya, tidak
+    // perlu hitung ulang rata-rata di sisi web.
     const { data: latestReadings, error: sensorError } = await supabase
       .from("sensors")
       .select("*")
