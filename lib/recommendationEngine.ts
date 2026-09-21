@@ -3,7 +3,7 @@ import { getSupabaseServer } from "./supabaseServer";
 import { Device, SensorReading } from "./types";
 import { runRuleEngine } from "./rules/ruleEngine";
 import { generateRecommendationText } from "./groq";
-import { toSensorQueryBoundary } from "./sensorTimeOffset";
+import { fetchRainfallTotal } from "./rainfall";
 
 export interface GeneratedRecommendation {
   deviceId: number;
@@ -35,18 +35,15 @@ async function getLatestReading(deviceId: number): Promise<SensorReading | null>
   return data && data.length > 0 ? data[0] : null;
 }
 
+// Curah hujan 24 jam terakhir dijumlahkan di database dari tabel
+// `rainfall_readings` (sensor hujan terpisah), bukan dari `sensors.rainfall`.
+// Kalau sensor hujan tidak mengirim data sama sekali, dianggap 0 mm (sama
+// seperti perilaku sebelumnya kalau tidak ada baris).
 async function getRainfallSum24h(deviceId: number): Promise<number> {
-  const since = toSensorQueryBoundary(new Date(Date.now() - 24 * 60 * 60 * 1000));
-  const { data, error } = await supabase
-    .from("sensors")
-    .select("rainfall")
-    .eq("device_id", deviceId)
-    .gte("created_at", since)
-    // Interval kirim device sekarang 1 menit -> 24 jam bisa ~1440 baris,
-    // melebihi batas default Supabase (1000) kalau tidak di-limit eksplisit.
-    .limit(2000);
-  if (error || !data) return 0;
-  return data.reduce((sum, r) => sum + (r.rainfall ?? 0), 0);
+  const end = new Date();
+  const start = new Date(end.getTime() - 24 * 60 * 60 * 1000);
+  const total = await fetchRainfallTotal(deviceId, { start, end });
+  return total ?? 0;
 }
 
 /**

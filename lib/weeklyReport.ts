@@ -2,6 +2,7 @@ import { supabase } from "./supabase";
 import { getSupabaseServer } from "./supabaseServer";
 import { Device, SensorReading } from "./types";
 import { fetchReadings, computeStats, computeDeltaPct, PeriodStats } from "./statsEngine";
+import { fetchRainfallTotal } from "./rainfall";
 import { DateRange, getPreviousRange } from "./dateRange";
 import { createQuickChartUrl } from "./quickchart";
 import { sendTelegramPhoto, sendTelegramMessage } from "./telegram";
@@ -54,7 +55,7 @@ async function getLatestRecommendation(deviceId: number): Promise<string | null>
  */
 function bucketDailyAverage(
   readings: SensorReading[],
-  field: "temperature" | "humidity" | "wind_speed" | "rainfall"
+  field: "temperature" | "humidity" | "wind_speed"
 ): { date: string; value: number }[] {
   const groups: Record<string, number[]> = {};
   for (const r of readings) {
@@ -177,8 +178,13 @@ export async function generateWeeklyReport(
   for (const device of devices as Device[]) {
     const readings = await fetchReadings(device.id, range);
     const prevReadings = await fetchReadings(device.id, prevRange);
-    const stats = computeStats(readings);
-    const prevStats = computeStats(prevReadings);
+    // Curah hujan dari tabel rainfall_readings (sensor hujan terpisah).
+    const [rainTotal, prevRainTotal] = await Promise.all([
+      fetchRainfallTotal(device.id, range),
+      fetchRainfallTotal(device.id, prevRange),
+    ]);
+    const stats = { ...computeStats(readings), totalRainfall: rainTotal };
+    const prevStats = { ...computeStats(prevReadings), totalRainfall: prevRainTotal };
     const recommendation = await getLatestRecommendation(device.id);
     perDevice.push({ device, readings, stats, prevStats, recommendation });
   }

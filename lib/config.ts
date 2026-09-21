@@ -5,6 +5,12 @@
 // nunggu jadwal kirim jam berikutnya).
 export const OFFLINE_THRESHOLD_MINUTES = 90;
 
+// Sensor hujan adalah ESP terpisah (tabel `rainfall_readings`) yang kirim
+// data tiap 1 menit, jadi ambang offline-nya sendiri dan jauh lebih ketat
+// daripada weather station di atas. 10 menit memberi toleransi kalau WiFi
+// sempat putus sebentar (data yang tertunda tetap dikirim menyusul).
+export const RAINFALL_OFFLINE_THRESHOLD_MINUTES = 10;
+
 // Sesuai PRD Bagian 9.4: kategori "U" pada wind_direction dikonfirmasi
 // sebagai kondisi Calm/tidak terdeteksi (bukan arah angin valid)
 export const WIND_DIRECTION_LABELS: Record<string, string> = {
@@ -38,5 +44,7 @@ export const SANITY_RANGES = {
   temperature: { min: 10, max: 45 }, // °C
   humidity: { min: 0, max: 100 }, // %
   wind_speed: { min: 0, max: 40 }, // m/s
-  rainfall: { min: 0, max: 150 }, // mm per pembacaan
+  // Curah hujan sengaja TIDAK ada di sini: datanya sudah bukan dari tabel
+  // `sensors` lagi, tapi dari `rainfall_readings` (sensor tipping-bucket
+  // terpisah) yang dijumlahkan langsung di database (lib/rainfall.ts).
 };

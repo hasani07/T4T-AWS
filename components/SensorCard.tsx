@@ -3,7 +3,7 @@ import { WIND_DIRECTION_LABELS } from "@/lib/config";
 import { isDeviceOnline, formatRelativeTime, formatDateTime } from "@/lib/deviceStatus";
 import { calcVPD, classifyVPD } from "@/lib/rules/ruleEngine";
 import StatusBadge from "./StatusBadge";
-import { Thermometer, Droplets, Wind, CloudRain, Compass, Gauge, LucideIcon } from "lucide-react";
+import { Thermometer, Droplets, Wind, Compass, Gauge, LucideIcon } from "lucide-react";
 
 const VPD_CLASS_LABEL: Record<string, string> = {
   rendah: "Rendah",
@@ -94,13 +94,9 @@ export default function SensorCard({
             />
           </div>
 
+          {/* Curah hujan TIDAK ditampilkan di kartu ini: sensor hujan adalah
+              ESP terpisah dengan kartunya sendiri (components/RainfallCard). */}
           <div className="mt-2.5 grid grid-cols-2 gap-2.5">
-            <MetricPill
-              icon={CloudRain}
-              color="#22D3EE"
-              value={`${latest.rainfall.toFixed(1)} mm`}
-              label="Curah Hujan"
-            />
             {vpd !== null && vpdClass && (
               <MetricPill
                 icon={Gauge}

@@ -632,3 +632,26 @@ firmware sudah menerapkan itu di sisi alat.
 `generate-recommendation` (rekomendasi AI harian) sudah lebih dulu
 dirombak jadi berbasis agregat 24 jam — otomatis tetap benar dengan
 volume data yang lebih rapat, tidak perlu disentuh lagi.
+
+## Curah Hujan dari Sensor Terpisah (`rainfall_readings`)
+
+Curah hujan **tidak lagi** dibaca dari kolom `sensors.rainfall`. Sensor hujan
+sekarang ESP tersendiri (tipping bucket SEN0575) yang kirim tiap 1 menit ke
+tabel `rainfall_readings`. Id device yang sama dipakai di `sensors` dan
+`rainfall_readings` untuk lokasi yang sama, jadi cukup dicocokkan lewat
+`device.id` — tidak perlu tabel pemetaan.
+
+- Dashboard: kartu cuaca (`SensorCard`) dan kartu hujan (`RainfallCard`)
+  terpisah, dengan status online/offline masing-masing. Kartu hujan
+  menampilkan akumulasi 1 / 3 / 6 / 12 / 24 jam (bergulir) dan total sejak
+  00:00 WIB.
+- Analitik, Excel, laporan mingguan, rekomendasi AI, dan bot Telegram
+  memakai total hujan dari database (fungsi RPC `rainfall_total` dan
+  `rainfall_buckets`).
+- CSV: cuaca dan curah hujan diunduh sebagai dua file terpisah.
+- Semua akses ke data hujan lewat `lib/rainfall.ts`.
+- **Wajib**: jalankan `supabase/sql/008_rainfall_readings.sql` (aman diulang;
+  hanya membuat/mengubah objek khusus hujan, tidak menyentuh `devices` dan
+  `sensors`).
+
+Rincian perubahan & langkah deploy: lihat `CHANGELOG_RAINFALL.md`.

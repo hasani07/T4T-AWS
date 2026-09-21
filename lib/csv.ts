@@ -2,6 +2,7 @@ import { supabase } from "./supabase";
 import { SensorReading } from "./types";
 import { DateRange } from "./dateRange";
 import { toSensorQueryBoundary } from "./sensorTimeOffset";
+import { RainfallRow } from "./rainfall";
 
 const PAGE_SIZE = 1000; // batas default Supabase per query
 
@@ -53,7 +54,9 @@ function csvEscape(value: string | number): string {
 }
 
 /**
- * Bangun konten CSV dari data mentah. TIDAK menerapkan filter sanity-check
+ * Bangun konten CSV dari data mentah weather station (tabel `sensors`).
+ * Kolom `rainfall` sengaja tidak disertakan: hujan sekarang dari sensor
+ * terpisah — pakai buildRainfallCsv(). TIDAK menerapkan filter sanity-check
  * seperti di halaman Analitik — export ini sengaja apa adanya (raw),
  * supaya bisa dipakai untuk audit/investigasi termasuk baris yang
  * dianggap anomali di Analitik.
@@ -70,7 +73,6 @@ export function buildCsv(
     "humidity",
     "wind_speed",
     "wind_direction",
-    "rainfall",
   ];
 
   const lines = [header.join(",")];
@@ -86,7 +88,42 @@ export function buildCsv(
         r.humidity,
         r.wind_speed,
         csvEscape(r.wind_direction),
-        r.rainfall,
+      ].join(",")
+    );
+  }
+
+  return lines.join("\n");
+}
+
+/**
+ * CSV mentah curah hujan dari tabel `rainfall_readings` (sensor hujan yang
+ * terpisah dari weather station).
+ *  - rain_mm            : hujan sejak pengiriman sebelumnya (normalnya 1 menit)
+ *  - rainfall_daily_mm  : akumulasi sejak 00:00 WIB pada saat pengiriman
+ * Sama seperti CSV sensor: data apa adanya, tanpa filter.
+ */
+export function buildRainfallCsv(
+  rows: RainfallRow[],
+  deviceTypeById: Record<number, string>
+): string {
+  const header = [
+    "created_at",
+    "device_id",
+    "device_type",
+    "rain_mm",
+    "rainfall_daily_mm",
+  ];
+
+  const lines = [header.join(",")];
+
+  for (const r of rows) {
+    lines.push(
+      [
+        r.created_at,
+        r.device_id,
+        csvEscape(deviceTypeById[r.device_id] ?? ""),
+        r.rain_mm,
+        r.rainfall ?? "",
       ].join(",")
     );
   }

@@ -69,6 +69,56 @@ function toSensorQueryBoundary(date: Date): string {
   return new Date(date.getTime() + 7 * 60 * 60 * 1000).toISOString();
 }
 
+// ---------- Curah hujan dari tabel rainfall_readings ----------
+// Curah hujan TIDAK lagi dibaca dari sensors.rainfall: sensornya sekarang
+// ESP terpisah yang menulis ke tabel `rainfall_readings` (device_id sama
+// dengan weather station di lokasi yang sama). Dijumlahkan langsung di
+// database lewat fungsi rainfall_total() / rainfall_buckets() — lihat
+// supabase/sql/008_rainfall_readings.sql (WAJIB dijalankan dulu).
+async function fetchRainfallTotal(
+  client: ReturnType<typeof createClient>,
+  deviceId: number,
+  start: Date,
+  end: Date
+): Promise<number | null> {
+  const { data, error } = await client.rpc("rainfall_total", {
+    p_device_id: deviceId,
+    p_start: toSensorQueryBoundary(start),
+    p_end: toSensorQueryBoundary(end),
+  });
+  if (error) {
+    console.error(`Gagal ambil total hujan device ${deviceId}:`, error);
+    return null;
+  }
+  if (data === null || data === undefined) return null;
+  const n = Number(data);
+  return Number.isFinite(n) ? n : null;
+}
+
+// Total hujan per hari (kunci "YYYY-MM-DD", jam WIB) untuk isi file Excel.
+async function fetchRainfallDaily(
+  client: ReturnType<typeof createClient>,
+  deviceId: number,
+  start: Date,
+  end: Date
+): Promise<Record<string, number>> {
+  const { data, error } = await client.rpc("rainfall_buckets", {
+    p_device_id: deviceId,
+    p_start: toSensorQueryBoundary(start),
+    p_end: toSensorQueryBoundary(end),
+    p_bucket: "day",
+  });
+  if (error) {
+    console.error(`Gagal ambil hujan harian device ${deviceId}:`, error);
+    return {};
+  }
+  const out: Record<string, number> = {};
+  for (const row of (data ?? []) as { bucket: string; rain_mm: number | string }[]) {
+    out[String(row.bucket)] = Number(row.rain_mm);
+  }
+  return out;
+}
+
 function buildRangeForDays(days: number): DateRange {
   const end = new Date();
   const start = new Date(end.getTime() - days * 24 * 60 * 60 * 1000);
@@ -90,9 +140,8 @@ function isValidReading(r: SensorReading): boolean {
     r.humidity >= SANITY_RANGES.humidity.min &&
     r.humidity <= SANITY_RANGES.humidity.max &&
     r.wind_speed >= SANITY_RANGES.wind_speed.min &&
-    r.wind_speed <= SANITY_RANGES.wind_speed.max &&
-    r.rainfall >= SANITY_RANGES.rainfall.min &&
-    r.rainfall <= SANITY_RANGES.rainfall.max
+    r.wind_speed <= SANITY_RANGES.wind_speed.max
+    // curah hujan tidak dicek di sini lagi: bukan dari tabel sensors
   );
 }
 
@@ -112,7 +161,6 @@ function computeStats(readings: SensorReading[]): PeriodStats {
   const temps = valid.map((r) => r.temperature);
   const hums = valid.map((r) => r.humidity);
   const winds = valid.map((r) => r.wind_speed);
-  const rains = valid.map((r) => r.rainfall);
 
   const directionCounts: Record<string, number> = {};
   for (const r of valid) {
@@ -132,7 +180,7 @@ function computeStats(readings: SensorReading[]): PeriodStats {
     avgTemperature: avg(temps),
     avgHumidity: avg(hums),
     avgWindSpeed: avg(winds),
-    totalRainfall: rains.reduce((s, v) => s + v, 0),
+    totalRainfall: null, // diisi handler dari tabel rainfall_readings
     dominantWindDirection,
   };
 }
@@ -248,10 +296,13 @@ interface DailyAgg {
   avgTemp: number;
   avgHum: number;
   avgWind: number;
-  totalRain: number;
+  totalRain: number | null; // dari rainfall_readings; null = sensor hujan tidak kirim data
 }
 
-function aggregateDailyFull(readings: SensorReading[]): DailyAgg[] {
+function aggregateDailyFull(
+  readings: SensorReading[],
+  rainByDay: Record<string, number>
+): DailyAgg[] {
   const valid = readings.filter(isValidReading);
   const groups: Record<string, SensorReading[]> = {};
   for (const r of valid) {
@@ -267,7 +318,7 @@ function aggregateDailyFull(readings: SensorReading[]): DailyAgg[] {
       avgTemp: Number(avg(rows.map((r) => r.temperature)).toFixed(1)),
       avgHum: Number(avg(rows.map((r) => r.humidity)).toFixed(1)),
       avgWind: Number(avg(rows.map((r) => r.wind_speed)).toFixed(2)),
-      totalRain: Number(rows.reduce((s, r) => s + r.rainfall, 0).toFixed(1)),
+      totalRain: date in rainByDay ? Number(rainByDay[date].toFixed(1)) : null,
     }));
 }
 
@@ -276,10 +327,12 @@ function aggregateDailyFull(readings: SensorReading[]): DailyAgg[] {
  * Pakai library "xlsx" (SheetJS): ringan & terbukti jalan baik di Deno,
  * beda dengan "exceljs" yang dipakai di sisi Next.js.
  */
-function buildExcelBuffer(perDevice: { device: Device; readings: SensorReading[] }[]): Uint8Array {
+function buildExcelBuffer(
+  perDevice: { device: Device; readings: SensorReading[]; rainByDay: Record<string, number> }[]
+): Uint8Array {
   const wb = XLSX.utils.book_new();
   for (const d of perDevice) {
-    const daily = aggregateDailyFull(d.readings);
+    const daily = aggregateDailyFull(d.readings, d.rainByDay);
     const rows = daily.map((r) => ({
       Tanggal: r.date,
       "Suhu Rata-rata (°C)": r.avgTemp,
@@ -444,10 +497,16 @@ Deno.serve(async (_req: Request) => {
     for (const device of devices as Device[]) {
       const readings = await fetchReadings(device.id, range);
       const prevReadings = await fetchReadings(device.id, prevRange);
-      const stats = computeStats(readings);
-      const prevStats = computeStats(prevReadings);
+      // Curah hujan dari sensor hujan terpisah (tabel rainfall_readings)
+      const [rainTotal, prevRainTotal, rainByDay] = await Promise.all([
+        fetchRainfallTotal(supabaseRead, device.id, range.start, range.end),
+        fetchRainfallTotal(supabaseRead, device.id, prevRange.start, prevRange.end),
+        fetchRainfallDaily(supabaseRead, device.id, range.start, range.end),
+      ]);
+      const stats = { ...computeStats(readings), totalRainfall: rainTotal };
+      const prevStats = { ...computeStats(prevReadings), totalRainfall: prevRainTotal };
       const recommendation = await getLatestRecommendation(device.id);
-      perDevice.push({ device, readings, stats, prevStats, recommendation });
+      perDevice.push({ device, readings, stats, prevStats, recommendation, rainByDay });
     }
 
     const chartConfig = buildTemperatureChartConfig(
@@ -475,7 +534,7 @@ Deno.serve(async (_req: Request) => {
       }
 
       const excelBuffer = buildExcelBuffer(
-        perDevice.map((d) => ({ device: d.device, readings: d.readings }))
+        perDevice.map((d) => ({ device: d.device, readings: d.readings, rainByDay: d.rainByDay }))
       );
       const excelFilename = `laporan_mingguan_${range.start.toISOString().slice(0, 10)}_sd_${new Date(
         range.end.getTime() - 1

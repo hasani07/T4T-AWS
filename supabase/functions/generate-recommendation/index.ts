@@ -71,6 +71,32 @@ function toSensorQueryBoundary(date: Date): string {
   return new Date(date.getTime() + 7 * 60 * 60 * 1000).toISOString();
 }
 
+// ---------- Curah hujan dari tabel rainfall_readings ----------
+// Curah hujan TIDAK lagi dibaca dari sensors.rainfall: sensornya sekarang
+// ESP terpisah yang menulis ke tabel `rainfall_readings` (device_id sama
+// dengan weather station di lokasi yang sama). Dijumlahkan langsung di
+// database lewat fungsi rainfall_total() / rainfall_buckets() — lihat
+// supabase/sql/008_rainfall_readings.sql (WAJIB dijalankan dulu).
+async function fetchRainfallTotal(
+  client: ReturnType<typeof createClient>,
+  deviceId: number,
+  start: Date,
+  end: Date
+): Promise<number | null> {
+  const { data, error } = await client.rpc("rainfall_total", {
+    p_device_id: deviceId,
+    p_start: toSensorQueryBoundary(start),
+    p_end: toSensorQueryBoundary(end),
+  });
+  if (error) {
+    console.error(`Gagal ambil total hujan device ${deviceId}:`, error);
+    return null;
+  }
+  if (data === null || data === undefined) return null;
+  const n = Number(data);
+  return Number.isFinite(n) ? n : null;
+}
+
 function isValidReading(r: SensorReading): boolean {
   return (
     r.temperature >= SANITY_RANGES.temperature.min &&
@@ -78,9 +104,8 @@ function isValidReading(r: SensorReading): boolean {
     r.humidity >= SANITY_RANGES.humidity.min &&
     r.humidity <= SANITY_RANGES.humidity.max &&
     r.wind_speed >= SANITY_RANGES.wind_speed.min &&
-    r.wind_speed <= SANITY_RANGES.wind_speed.max &&
-    r.rainfall >= SANITY_RANGES.rainfall.min &&
-    r.rainfall <= SANITY_RANGES.rainfall.max
+    r.wind_speed <= SANITY_RANGES.wind_speed.max
+    // curah hujan tidak dicek di sini lagi: bukan dari tabel sensors
   );
 }
 
@@ -98,7 +123,6 @@ function computeStats(readings: SensorReading[]): PeriodStats | null {
   const temps = valid.map((r) => r.temperature);
   const hums = valid.map((r) => r.humidity);
   const winds = valid.map((r) => r.wind_speed);
-  const rains = valid.map((r) => r.rainfall);
 
   const directionCounts: Record<string, number> = {};
   for (const r of valid) {
@@ -123,7 +147,8 @@ function computeStats(readings: SensorReading[]): PeriodStats | null {
     maxHumidity: Math.max(...hums),
     avgWindSpeed: avg(winds),
     maxWindSpeed: Math.max(...winds),
-    totalRainfall: rains.reduce((s, v) => s + v, 0),
+    // Diisi oleh handler dari tabel rainfall_readings (bukan dari sensors).
+    totalRainfall: 0,
     dominantWindDirection,
   };
 }
@@ -357,6 +382,12 @@ Deno.serve(async (_req: Request) => {
         console.log(`Tidak ada data valid 24 jam terakhir untuk device ${device.id}, skip.`);
         continue;
       }
+
+      // Curah hujan 24 jam terakhir dari sensor hujan terpisah (rainfall_readings).
+      const rainEnd = new Date();
+      const rainStart = new Date(rainEnd.getTime() - 24 * 60 * 60 * 1000);
+      stats.totalRainfall =
+        (await fetchRainfallTotal(supabaseRead, device.id, rainStart, rainEnd)) ?? 0;
 
       const vpd = calcVPD(stats.avgTemperature, stats.avgHumidity);
       const vpdClass = classifyVPD(vpd);

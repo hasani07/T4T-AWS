@@ -3,7 +3,13 @@
 import { useState } from "react";
 import { Device } from "@/lib/types";
 import { PeriodPreset, getPeriodRange } from "@/lib/dateRange";
-import { fetchAllReadingsInRange, buildCsv, triggerCsvDownload } from "@/lib/csv";
+import {
+  fetchAllReadingsInRange,
+  buildCsv,
+  buildRainfallCsv,
+  triggerCsvDownload,
+} from "@/lib/csv";
+import { fetchAllRainfallRowsInRange } from "@/lib/rainfall";
 import PeriodSelector from "@/components/analytics/PeriodSelector";
 
 const ALL_DEVICES_VALUE = "all";
@@ -22,7 +28,7 @@ export default function DownloadClient({ devices }: { devices: Device[] }) {
     devices.map((d) => [d.id, d.type])
   );
 
-  async function handleDownload() {
+  async function handleDownload(kind: "sensor" | "rainfall") {
     if (preset === "custom" && (!customStart || !customEnd)) {
       setErrorMsg("Pilih tanggal awal dan akhir dulu untuk custom range.");
       return;
@@ -40,14 +46,23 @@ export default function DownloadClient({ devices }: { devices: Device[] }) {
           ? devices.map((d) => d.id)
           : [Number(deviceSelection)];
 
-      const readings = await fetchAllReadingsInRange(deviceIds, range);
+      let csv = "";
+      let rowCount = 0;
 
-      if (readings.length === 0) {
+      if (kind === "sensor") {
+        const readings = await fetchAllReadingsInRange(deviceIds, range);
+        rowCount = readings.length;
+        if (rowCount > 0) csv = buildCsv(readings, deviceTypeById);
+      } else {
+        const rainRows = await fetchAllRainfallRowsInRange(deviceIds, range);
+        rowCount = rainRows.length;
+        if (rowCount > 0) csv = buildRainfallCsv(rainRows, deviceTypeById);
+      }
+
+      if (rowCount === 0) {
         setErrorMsg("Tidak ada data pada rentang tanggal yang dipilih.");
         return;
       }
-
-      const csv = buildCsv(readings, deviceTypeById);
 
       const deviceLabel =
         deviceSelection === ALL_DEVICES_VALUE
@@ -55,12 +70,13 @@ export default function DownloadClient({ devices }: { devices: Device[] }) {
           : deviceTypeById[Number(deviceSelection)]?.toLowerCase() ?? "device";
 
       const fmtDate = (d: Date) => d.toISOString().slice(0, 10);
-      const filename = `sensor-data_${deviceLabel}_${fmtDate(range.start)}_sd_${fmtDate(
+      const filePrefix = kind === "sensor" ? "sensor-data" : "curah-hujan";
+      const filename = `${filePrefix}_${deviceLabel}_${fmtDate(range.start)}_sd_${fmtDate(
         new Date(range.end.getTime() - 1)
       )}.csv`;
 
       triggerCsvDownload(filename, csv);
-      setLastDownloadInfo(`${readings.length} baris data berhasil di-export (${filename}).`);
+      setLastDownloadInfo(`${rowCount} baris data berhasil di-export (${filename}).`);
     } catch (err) {
       console.error("Gagal export CSV:", err);
       setErrorMsg("Gagal mengambil/menyiapkan data. Coba lagi.");
@@ -95,13 +111,22 @@ export default function DownloadClient({ devices }: { devices: Device[] }) {
         />
       </div>
 
-      <button
-        onClick={handleDownload}
-        disabled={loading}
-        className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        {loading ? "Menyiapkan file..." : "Download CSV"}
-      </button>
+      <div className="flex flex-wrap gap-3">
+        <button
+          onClick={() => handleDownload("sensor")}
+          disabled={loading}
+          className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {loading ? "Menyiapkan file..." : "Download CSV Cuaca"}
+        </button>
+        <button
+          onClick={() => handleDownload("rainfall")}
+          disabled={loading}
+          className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {loading ? "Menyiapkan file..." : "Download CSV Curah Hujan"}
+        </button>
+      </div>
 
       {errorMsg && <p className="text-sm text-rose-600">{errorMsg}</p>}
       {lastDownloadInfo && (
@@ -112,6 +137,8 @@ export default function DownloadClient({ devices }: { devices: Device[] }) {
         Catatan: file CSV berisi data mentah apa adanya (termasuk baris yang
         mungkin dianggap anomali/glitch sensor di halaman Analitik) — cocok
         untuk keperluan audit atau analisis lebih lanjut di luar dashboard.
+        Data cuaca (suhu, kelembaban, angin) dan data curah hujan berasal dari
+        alat yang berbeda, jadi diunduh sebagai dua file terpisah.
       </p>
     </div>
   );

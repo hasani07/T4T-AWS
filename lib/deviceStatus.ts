@@ -44,11 +44,16 @@ function sensorTimestampToTrueUtcMs(iso: string): number {
   );
 }
 
-export function isDeviceOnline(lastCreatedAt: string | null | undefined): boolean {
+export function isDeviceOnline(
+  lastCreatedAt: string | null | undefined,
+  // Default = ambang weather station. Sensor hujan (ESP terpisah, kirim
+  // tiap menit) memakai RAINFALL_OFFLINE_THRESHOLD_MINUTES — lihat config.
+  thresholdMinutes: number = OFFLINE_THRESHOLD_MINUTES
+): boolean {
   if (!lastCreatedAt) return false;
   const trueInstantMs = sensorTimestampToTrueUtcMs(lastCreatedAt);
   const diffMinutes = (Date.now() - trueInstantMs) / 1000 / 60;
-  return diffMinutes <= OFFLINE_THRESHOLD_MINUTES;
+  return diffMinutes <= thresholdMinutes;
 }
 
 export function formatRelativeTime(lastCreatedAt: string): string {

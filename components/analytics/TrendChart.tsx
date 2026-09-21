@@ -13,6 +13,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { SensorReading } from "@/lib/types";
+import { RainBucket } from "@/lib/rainfall";
 
 // ⚠️ Sama seperti di lib/deviceStatus.ts: timestamp sensor diberi label
 // "+00" (UTC) padahal angkanya sudah WIB. Untuk label sumbu waktu di
@@ -44,7 +45,13 @@ const METRICS: { key: MetricKey; color: string; type: "line" | "bar" }[] = [
   { key: "Curah Hujan", color: "#38bdf8", type: "bar" },
 ];
 
-export default function TrendChart({ readings }: { readings: SensorReading[] }) {
+export default function TrendChart({
+  readings,
+  rainBuckets,
+}: {
+  readings: SensorReading[];
+  rainBuckets: RainBucket[];
+}) {
   const [visible, setVisible] = useState<Record<MetricKey, boolean>>({
     Suhu: true,
     Kelembaban: true,
@@ -66,13 +73,30 @@ export default function TrendChart({ readings }: { readings: SensorReading[] }) 
     );
   }
 
-  const data = readings.map((r) => ({
-    time: formatSensorTimeLabel(r.created_at),
-    Suhu: r.temperature,
-    Kelembaban: r.humidity,
-    "Kec. Angin": r.wind_speed,
-    "Curah Hujan": r.rainfall,
-  }));
+  // Curah hujan berasal dari tabel & ESP terpisah (rainfall_readings) dan
+  // dijumlahkan per JAM di database. Batang hujan diletakkan di pembacaan
+  // cuaca PERTAMA pada jam tersebut (kunci "YYYY-MM-DDTHH" sama dengan
+  // format bucket dari fungsi rainfall_buckets), jadi tiap jam hanya punya
+  // satu batang berisi total mm jam itu — bukan diulang di tiap menit.
+  const rainByHour: Record<string, number> = {};
+  for (const b of rainBuckets) rainByHour[b.bucket] = b.rain_mm;
+  const hourAlreadyPlaced = new Set<string>();
+
+  const data = readings.map((r) => {
+    const hourKey = r.created_at.slice(0, 13);
+    let rain: number | null = null;
+    if (!hourAlreadyPlaced.has(hourKey) && rainByHour[hourKey] !== undefined) {
+      rain = rainByHour[hourKey];
+      hourAlreadyPlaced.add(hourKey);
+    }
+    return {
+      time: formatSensorTimeLabel(r.created_at),
+      Suhu: r.temperature,
+      Kelembaban: r.humidity,
+      "Kec. Angin": r.wind_speed,
+      "Curah Hujan": rain,
+    };
+  });
 
   const anyVisible = METRICS.some((m) => visible[m.key]);
 
@@ -168,7 +192,7 @@ export default function TrendChart({ readings }: { readings: SensorReading[] }) 
 
       <p className="mt-2 text-[11px] text-slate-400">
         Suhu (°C), Kelembaban (%), dan Kecepatan Angin (m/s) memakai sumbu kiri.
-        Curah Hujan (mm, batang) memakai sumbu kanan karena skalanya berbeda.
+        Curah Hujan (mm per jam, batang) memakai sumbu kanan karena skalanya berbeda.
       </p>
     </div>
   );

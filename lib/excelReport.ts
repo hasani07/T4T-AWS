@@ -3,6 +3,7 @@ import { SensorReading } from "./types";
 import { SANITY_RANGES } from "./config";
 import { DateRange, getPeriodRange } from "./dateRange";
 import { fetchReadings } from "./statsEngine";
+import { fetchRainfallBuckets } from "./rainfall";
 
 export type ExcelGranularity = "hourly" | "weekly" | "monthly";
 
@@ -15,7 +16,9 @@ interface BucketStats {
   maxHum: number;
   avgHum: number;
   avgWind: number;
-  totalRain: number;
+  // Dari tabel rainfall_readings (sensor hujan terpisah). null = sensor
+  // hujan tidak mengirim data pada periode ini.
+  totalRain: number | null;
 }
 
 function isValidReading(r: SensorReading): boolean {
@@ -25,9 +28,7 @@ function isValidReading(r: SensorReading): boolean {
     r.humidity >= SANITY_RANGES.humidity.min &&
     r.humidity <= SANITY_RANGES.humidity.max &&
     r.wind_speed >= SANITY_RANGES.wind_speed.min &&
-    r.wind_speed <= SANITY_RANGES.wind_speed.max &&
-    r.rainfall >= SANITY_RANGES.rainfall.min &&
-    r.rainfall <= SANITY_RANGES.rainfall.max
+    r.wind_speed <= SANITY_RANGES.wind_speed.max
   );
 }
 
@@ -71,7 +72,10 @@ function average(values: number[]): number {
 
 export function aggregateReadings(
   readings: SensorReading[],
-  granularity: ExcelGranularity
+  granularity: ExcelGranularity,
+  // Total hujan per bucket (kunci sama dengan bucketKey), dari fungsi
+  // rainfall_buckets di database. Weather station tidak lagi membawa hujan.
+  rainByBucket: Record<string, number>
 ): BucketStats[] {
   const valid = readings.filter(isValidReading);
   const groups: Record<string, SensorReading[]> = {};
@@ -88,7 +92,6 @@ export function aggregateReadings(
       const temps = rows.map((r) => r.temperature);
       const hums = rows.map((r) => r.humidity);
       const winds = rows.map((r) => r.wind_speed);
-      const rains = rows.map((r) => r.rainfall);
 
       return {
         period: formatBucketLabel(key, granularity),
@@ -99,7 +102,7 @@ export function aggregateReadings(
         maxHum: Math.max(...hums),
         avgHum: average(hums),
         avgWind: average(winds),
-        totalRain: rains.reduce((s, v) => s + v, 0),
+        totalRain: rainByBucket[key] ?? null,
       };
     });
 }
@@ -169,8 +172,19 @@ export async function buildExcelReport(params: {
   dateForHourly?: string;
 }): Promise<Buffer> {
   const range = getRangeForGranularity(params.granularity, params.dateForHourly);
-  const readings = await fetchReadings(params.deviceId, range);
-  const stats = aggregateReadings(readings, params.granularity);
+  const [readings, rainBuckets] = await Promise.all([
+    fetchReadings(params.deviceId, range),
+    // hourly -> per jam, weekly/monthly -> per hari (sama dengan bucketKey)
+    fetchRainfallBuckets(
+      params.deviceId,
+      range,
+      params.granularity === "hourly" ? "hour" : "day"
+    ),
+  ]);
+  const rainByBucket: Record<string, number> = {};
+  for (const b of rainBuckets) rainByBucket[b.bucket] = b.rain_mm;
+
+  const stats = aggregateReadings(readings, params.granularity, rainByBucket);
 
   const chartTitle = `Grafik Suhu — ${GRANULARITY_LABEL[params.granularity]} — ${params.deviceLabel}`;
   const chartConfig = buildChartConfig(stats, chartTitle);
@@ -209,7 +223,7 @@ export async function buildExcelReport(params: {
       Number(s.maxHum.toFixed(1)),
       Number(s.avgHum.toFixed(1)),
       Number(s.avgWind.toFixed(2)),
-      Number(s.totalRain.toFixed(1)),
+      s.totalRain === null ? null : Number(s.totalRain.toFixed(1)),
     ];
   });
 

@@ -1,6 +1,8 @@
 import { supabase } from "@/lib/supabase";
-import { DeviceWithLatestReading } from "@/lib/types";
+import { Device, DeviceRainfall, DeviceWithLatestReading } from "@/lib/types";
 import SensorCardGrid from "@/components/SensorCardGrid";
+import RainfallCardGrid from "@/components/RainfallCardGrid";
+import { fetchDeviceRainfalls } from "@/lib/rainfall";
 import PageShell from "@/components/PageShell";
 import DeviceMap, { DeviceMapMarker } from "@/components/DeviceMap";
 import TelegramJoinCard from "@/components/TelegramJoinCard";
@@ -83,6 +85,24 @@ function SummaryPill({
 export default async function DashboardPage() {
   const devicesWithReadings = await getDevicesWithLatestReadings();
 
+  // Curah hujan berasal dari sensor/ESP terpisah (tabel `rainfall_readings`),
+  // BUKAN dari kolom `sensors.rainfall`. Id device yang sama dipakai di
+  // kedua tabel, jadi cukup dicocokkan lewat device.id.
+  const devices: Device[] = devicesWithReadings.map(({ id, type }) => ({ id, type }));
+  let rainfalls: DeviceRainfall[];
+  try {
+    rainfalls = await fetchDeviceRainfalls(devices.map((d) => d.id));
+  } catch (err) {
+    // Mis. view rainfall_summary belum dibuat: dashboard cuaca tetap jalan,
+    // kartu hujan menampilkan "belum ada data".
+    console.error("Gagal memuat data curah hujan:", err);
+    rainfalls = devices.map((d) => ({
+      deviceId: d.id,
+      summary: null,
+      lastReadingAt: null,
+    }));
+  }
+
   const onlineCount = devicesWithReadings.filter(
     (d) => d.latest && isDeviceOnline(d.latest.created_at)
   ).length;
@@ -106,7 +126,10 @@ export default async function DashboardPage() {
       ? readingsAvailable.reduce((sum, r) => sum + r.wind_speed, 0) / readingsAvailable.length
       : null;
 
-  const totalRainfall = readingsAvailable.reduce((sum, r) => sum + r.rainfall, 0);
+  const rainSummaries = rainfalls
+    .map((r) => r.summary)
+    .filter((r): r is NonNullable<typeof r> => r !== null);
+  const totalRainfall24h = rainSummaries.reduce((sum, r) => sum + r.acc_24h, 0);
 
   const mapMarkers: DeviceMapMarker[] = devicesWithReadings
     .filter((d) => DEVICE_COORDINATES[d.type])
@@ -166,12 +189,17 @@ export default async function DashboardPage() {
         <SummaryPill
           icon={CloudRain}
           color="#22D3EE"
-          value={`${totalRainfall.toFixed(1)} mm`}
-          label="Curah Hujan Terakhir (Total)"
+          value={rainSummaries.length > 0 ? `${totalRainfall24h.toFixed(1)} mm` : "-"}
+          label="Curah Hujan 24 Jam (Total)"
         />
       </div>
 
       <SensorCardGrid initialData={devicesWithReadings} />
+
+      <div className="mt-6">
+        <h2 className="mb-3 text-sm font-semibold text-slate-900">Curah Hujan</h2>
+        <RainfallCardGrid devices={devices} initialData={rainfalls} />
+      </div>
 
       <div className="mt-6">
         <TelegramJoinCard />

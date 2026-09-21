@@ -105,6 +105,7 @@ Deno.serve(async (_req: Request) => {
       const tables = [
         "devices",
         "sensors",
+        "rainfall_readings", // sensor hujan terpisah (ESP sendiri)
         "system_logs",
         "ai_recommendations",
         "weekly_reports",

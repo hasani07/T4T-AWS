@@ -63,9 +63,8 @@ function isValidReading(r: SensorRecord): boolean {
     r.humidity >= SANITY_RANGES.humidity.min &&
     r.humidity <= SANITY_RANGES.humidity.max &&
     r.wind_speed >= SANITY_RANGES.wind_speed.min &&
-    r.wind_speed <= SANITY_RANGES.wind_speed.max &&
-    r.rainfall >= SANITY_RANGES.rainfall.min &&
-    r.rainfall <= SANITY_RANGES.rainfall.max
+    r.wind_speed <= SANITY_RANGES.wind_speed.max
+    // curah hujan tidak dicek di sini lagi: bukan dari tabel sensors
   );
 }
 

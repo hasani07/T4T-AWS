@@ -17,6 +17,10 @@ export interface PeriodStats {
   avgWindSpeed: number | null;
   minWindSpeed: number | null;
   maxWindSpeed: number | null;
+  // Selalu null dari computeStats(): curah hujan bukan lagi bagian dari
+  // tabel `sensors`. Isi dengan total dari tabel `rainfall_readings`
+  // lewat fetchRainfallTotal() di lib/rainfall.ts (dipanggil oleh
+  // pemakai computeStats).
   totalRainfall: number | null;
   dominantWindDirection: string | null;
   series: SensorReading[]; // hanya baris valid, dipakai untuk grafik tren
@@ -72,9 +76,7 @@ function isValidReading(r: SensorReading): boolean {
     r.humidity >= SANITY_RANGES.humidity.min &&
     r.humidity <= SANITY_RANGES.humidity.max &&
     r.wind_speed >= SANITY_RANGES.wind_speed.min &&
-    r.wind_speed <= SANITY_RANGES.wind_speed.max &&
-    r.rainfall >= SANITY_RANGES.rainfall.min &&
-    r.rainfall <= SANITY_RANGES.rainfall.max
+    r.wind_speed <= SANITY_RANGES.wind_speed.max
   );
 }
 
@@ -83,11 +85,14 @@ function average(values: number[]): number {
 }
 
 /**
- * Hitung statistik satu periode dari data mentah: rata-rata/min/max per
- * parameter, total curah hujan, dan arah angin dominan (dihitung sebagai
- * modus/frekuensi kategori, BUKAN circular mean numerik — karena
- * wind_direction tersimpan sebagai kategori kompas teks, sesuai PRD
- * Bagian 7). Kategori "U" (calm) dikecualikan dari perhitungan dominan.
+ * Hitung statistik satu periode dari data mentah weather station:
+ * rata-rata/min/max per parameter dan arah angin dominan. Curah hujan TIDAK
+ * dihitung di sini (lihat catatan di PeriodStats.totalRainfall).
+ *
+ * Arah angin dominan dihitung sebagai modus/frekuensi kategori, BUKAN
+ * circular mean numerik — karena wind_direction tersimpan sebagai kategori
+ * kompas teks (sesuai PRD Bagian 7). Kategori "U" (calm) dikecualikan dari
+ * perhitungan dominan.
  */
 export function computeStats(readings: SensorReading[]): PeriodStats {
   const valid = readings.filter(isValidReading);
@@ -116,7 +121,6 @@ export function computeStats(readings: SensorReading[]): PeriodStats {
   const temps = valid.map((r) => r.temperature);
   const hums = valid.map((r) => r.humidity);
   const winds = valid.map((r) => r.wind_speed);
-  const rains = valid.map((r) => r.rainfall);
 
   const directionCounts: Record<string, number> = {};
   for (const r of valid) {
@@ -145,7 +149,7 @@ export function computeStats(readings: SensorReading[]): PeriodStats {
     avgWindSpeed: average(winds),
     minWindSpeed: Math.min(...winds),
     maxWindSpeed: Math.max(...winds),
-    totalRainfall: rains.reduce((sum, v) => sum + v, 0),
+    totalRainfall: null,
     dominantWindDirection,
     series: valid,
   };
