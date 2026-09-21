@@ -1,9 +1,9 @@
-// PENDING: masih 90 menit (sesuai interval kirim SEKARANG yang masih
-// 1 jam). JANGAN diubah ke 15 menit sampai firmware BENERAN sudah mulai
-// kirim tiap 5 menit — kalau diubah duluan, status Online/Offline bakal
-// salah terus (device asli online tapi keliatan "Offline" karena
-// nunggu jadwal kirim jam berikutnya).
-export const OFFLINE_THRESHOLD_MINUTES = 90;
+// Weather station sekarang kirim data tiap 1 MENIT (bukan 1 jam lagi),
+// jadi ambang offline diperketat dari 90 menit menjadi 10 menit supaya
+// perangkat yang mati langsung kelihatan. Kalau suatu saat firmware
+// dikembalikan ke interval yang lebih jarang, naikkan lagi nilai ini
+// (kira-kira 1,5x interval kirim), kalau tidak status akan salah "Offline".
+export const OFFLINE_THRESHOLD_MINUTES = 10;
 
 // Sensor hujan adalah ESP terpisah (tabel `rainfall_readings`) yang kirim
 // data tiap 1 menit, jadi ambang offline-nya sendiri dan jauh lebih ketat

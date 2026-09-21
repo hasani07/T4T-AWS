@@ -8,7 +8,7 @@ weather station (tabel `sensors`). Weather station lama masih mengirim
 tampilan yang membaca kolom itu harus dipindah.
 
 Satu `device_id` dipakai bersama untuk lokasi yang sama
-(1 = Cisangkuy, 3 = Ciminyak). Tabelnya beda, jadi tidak bentrok.
+(1 = Cisangkuy, 2 = Ciminyak). Tabelnya beda, jadi tidak bentrok.
 
 ## Urutan deploy (PENTING, urut)
 
@@ -41,6 +41,8 @@ Satu `device_id` dipakai bersama untuk lokasi yang sama
 | `lib/weeklyReport.ts` | Total hujan periode & pembanding dari `rainfall_total` |
 | `components/RainfallCard.tsx` (baru) | Kartu hujan terpisah (akumulasi 1/3/6/12/24 J + hari ini + status sendiri) |
 | `components/RainfallCardGrid.tsx` (baru) | Deretan kartu hujan, polling 30 detik |
+| `components/DeviceStatusOverview.tsx` (baru) | Panel status 4 perangkat (weather + hujan per lokasi) |
+| `lib/deviceLastSeen.ts` (baru) | Ambil data terakhir tiap perangkat dari `sensors` dan `rainfall_readings` |
 | `components/SensorCard.tsx` | Hapus pill hujan (pindah ke kartu sendiri) |
 | `app/page.tsx` | Pill ringkasan "Curah Hujan 24 Jam (Total)"; section kartu hujan |
 | `components/analytics/*` | Total hujan dari RPC; batang hujan per jam di grafik tren |
@@ -54,6 +56,15 @@ Satu `device_id` dipakai bersama untuk lokasi yang sama
 
 ## Catatan perilaku
 
+- **Panel "Status Perangkat"** di atas dashboard menghitung tiap perangkat fisik
+  sendiri-sendiri (2 lokasi = 4 perangkat): Weather Station dan Sensor Hujan
+  untuk Cisangkuy dan Ciminyak, masing-masing dengan badge Online/Offline dan
+  "data terakhir X menit lalu". Ringkasan "X/4 online". Diperbarui sendiri
+  (tanpa reload) tiap 30 detik. Pill "Status Device" lama dihapus (diganti panel ini).
+- **Ambang offline weather station diperketat dari 90 menit menjadi 10 menit**
+  (`OFFLINE_THRESHOLD_MINUTES` di `lib/config.ts`), karena weather station sekarang
+  kirim tiap 1 menit. Kalau interval kirim diubah lagi, sesuaikan nilai ini.
+  Ikut memengaruhi badge di kartu cuaca dan warna titik di peta.
 - Kartu hujan online/offline pakai ambang 10 menit (sensor hujan kirim tiap
   1 menit), terpisah dari ambang weather station (90 menit).
 - "Curah Hujan" di kartu = hujan pada pengiriman terakhir. Kalau pengiriman

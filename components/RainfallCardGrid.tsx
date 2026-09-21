@@ -24,6 +24,16 @@ export default function RainfallCardGrid({
   const [rainfalls, setRainfalls] = useState<DeviceRainfall[]>(initialData);
   const deviceIdsKey = devices.map((d) => d.id).join(",");
 
+  // Status online/offline dihitung dari Date.now() saat render. Tanpa
+  // re-render berkala, badge akan NYANGKUT "Online" kalau ESP mati (tidak
+  // ada data baru) atau kalau polling sedang gagal. Sama seperti trik di
+  // SensorCardGrid.
+  const [, forceRerender] = useState(0);
+  useEffect(() => {
+    const interval = setInterval(() => forceRerender((n) => n + 1), 30_000);
+    return () => clearInterval(interval);
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     const ids = devices.map((d) => d.id);
@@ -50,14 +60,18 @@ export default function RainfallCardGrid({
   if (devices.length === 0) return null;
 
   return (
-    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-      {devices.map((device) => (
-        <RainfallCard
-          key={device.id}
-          locationName={device.type}
-          rainfall={rainfalls.find((r) => r.deviceId === device.id)}
-        />
-      ))}
+    <div>
+      <h2 className="mb-3 text-sm font-semibold text-slate-900">Curah Hujan</h2>
+
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+        {devices.map((device) => (
+          <RainfallCard
+            key={device.id}
+            locationName={device.type}
+            rainfall={rainfalls.find((r) => r.deviceId === device.id)}
+          />
+        ))}
+      </div>
     </div>
   );
 }

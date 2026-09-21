@@ -8,7 +8,7 @@ import { toSensorQueryBoundary } from "./sensorTimeOffset";
 // terpisah, kirim tiap 1 menit) — BUKAN dari kolom `sensors.rainfall`.
 //
 // Satu `device_id` dipakai bersama oleh weather station dan sensor hujan
-// di lokasi yang sama (mis. 1 = Cisangkuy, 3 = Ciminyak). Tabelnya beda,
+// di lokasi yang sama (mis. 1 = Cisangkuy, 2 = Ciminyak). Tabelnya beda,
 // jadi tidak bentrok.
 //
 // Timestamp `rainfall_readings.created_at` memakai konvensi yang SAMA

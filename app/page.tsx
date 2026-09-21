@@ -2,6 +2,8 @@ import { supabase } from "@/lib/supabase";
 import { Device, DeviceRainfall, DeviceWithLatestReading } from "@/lib/types";
 import SensorCardGrid from "@/components/SensorCardGrid";
 import RainfallCardGrid from "@/components/RainfallCardGrid";
+import DeviceStatusOverview from "@/components/DeviceStatusOverview";
+import { LastSeen } from "@/lib/deviceLastSeen";
 import { fetchDeviceRainfalls } from "@/lib/rainfall";
 import PageShell from "@/components/PageShell";
 import DeviceMap, { DeviceMapMarker } from "@/components/DeviceMap";
@@ -9,7 +11,7 @@ import TelegramJoinCard from "@/components/TelegramJoinCard";
 import LiveClock from "@/components/LiveClock";
 import { isDeviceOnline } from "@/lib/deviceStatus";
 import { DEVICE_COORDINATES } from "@/lib/config";
-import { Wifi, Thermometer, CloudRain, Droplets, Wind } from "lucide-react";
+import { Thermometer, CloudRain, Droplets, Wind } from "lucide-react";
 
 // Selalu ambil data terbaru saat halaman diakses, jangan pakai cache statis
 export const revalidate = 0;
@@ -60,7 +62,7 @@ function SummaryPill({
   value,
   label,
 }: {
-  icon: typeof Wifi;
+  icon: typeof Thermometer;
   color: string;
   value: string;
   label: string;
@@ -103,9 +105,12 @@ export default async function DashboardPage() {
     }));
   }
 
-  const onlineCount = devicesWithReadings.filter(
-    (d) => d.latest && isDeviceOnline(d.latest.created_at)
-  ).length;
+  const initialLastSeen: LastSeen = { weather: {}, rain: {} };
+  for (const d of devicesWithReadings) {
+    initialLastSeen.weather[d.id] = d.latest?.created_at ?? null;
+    initialLastSeen.rain[d.id] =
+      rainfalls.find((r) => r.deviceId === d.id)?.lastReadingAt ?? null;
+  }
 
   const readingsAvailable = devicesWithReadings
     .map((d) => d.latest)
@@ -155,13 +160,9 @@ export default async function DashboardPage() {
         <LiveClock />
       </header>
 
+      <DeviceStatusOverview devices={devices} initial={initialLastSeen} />
+
       <div className="mb-6 grid grid-cols-2 gap-3 md:flex md:flex-wrap">
-        <SummaryPill
-          icon={Wifi}
-          color="#34D399"
-          value={`${onlineCount}/${devicesWithReadings.length} Online`}
-          label="Status Device"
-        />
         {avgTemp !== null && (
           <SummaryPill
             icon={Thermometer}
@@ -197,7 +198,6 @@ export default async function DashboardPage() {
       <SensorCardGrid initialData={devicesWithReadings} />
 
       <div className="mt-6">
-        <h2 className="mb-3 text-sm font-semibold text-slate-900">Curah Hujan</h2>
         <RainfallCardGrid devices={devices} initialData={rainfalls} />
       </div>
 
