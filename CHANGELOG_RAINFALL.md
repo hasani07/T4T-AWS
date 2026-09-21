@@ -41,6 +41,8 @@ Satu `device_id` dipakai bersama untuk lokasi yang sama
 | `lib/weeklyReport.ts` | Total hujan periode & pembanding dari `rainfall_total` |
 | `components/RainfallCard.tsx` (baru) | Kartu hujan terpisah (akumulasi 1/3/6/12/24 J + hari ini + status sendiri) |
 | `components/RainfallCardGrid.tsx` (baru) | Deretan kartu hujan, polling 30 detik |
+| `lib/rainfallClass.ts` (baru) | Klasifikasi hujan standar BMKG: harian (mm/hari) dan per jam (mm/jam) |
+| `components/RainCategoryBadge.tsx`, `components/RainfallLegend.tsx` (baru) | Badge kategori dan legenda standar (lipat) |
 | `components/DeviceStatusOverview.tsx` (baru) | Panel status 4 perangkat (weather + hujan per lokasi) |
 | `lib/deviceLastSeen.ts` (baru) | Ambil data terakhir tiap perangkat dari `sensors` dan `rainfall_readings` |
 | `components/SensorCard.tsx` | Hapus pill hujan (pindah ke kartu sendiri) |
@@ -65,6 +67,11 @@ Satu `device_id` dipakai bersama untuk lokasi yang sama
   (`OFFLINE_THRESHOLD_MINUTES` di `lib/config.ts`), karena weather station sekarang
   kirim tiap 1 menit. Kalau interval kirim diubah lagi, sesuaikan nilai ini.
   Ikut memengaruhi badge di kartu cuaca dan warna titik di peta.
+- **Kategori hujan (standar BMKG)** di kartu hujan: "Hari ini" dari total sejak 00:00 WIB
+  (mm/hari: 0,5-20 ringan, 20-50 sedang, 50-100 lebat, 100-150 sangat lebat, >150 ekstrem)
+  dan "Intensitas 1 jam terakhir" (mm/jam: 1-5 ringan, 5-10 sedang, 10-20 lebat,
+  >20 sangat lebat). Di bawah ambang ringan ditampilkan "sangat ringan". Batas kelas ada di
+  satu tempat: `lib/rainfallClass.ts`. Legenda lipat di bawah kartu hujan.
 - Kartu hujan online/offline pakai ambang 10 menit (sensor hujan kirim tiap
   1 menit), terpisah dari ambang weather station (90 menit).
 - "Curah Hujan" di kartu = hujan pada pengiriman terakhir. Kalau pengiriman

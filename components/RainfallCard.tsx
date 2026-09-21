@@ -5,7 +5,9 @@ import {
   formatRelativeTime,
   formatDateTime,
 } from "@/lib/deviceStatus";
+import { classifyDailyRain, classifyHourlyRain } from "@/lib/rainfallClass";
 import StatusBadge from "./StatusBadge";
+import RainCategoryBadge from "./RainCategoryBadge";
 import { CloudRain } from "lucide-react";
 
 function fmtMm(value: number): string {
@@ -32,6 +34,26 @@ function AccumulationCell({
         {fmtMm(value)}{" "}
         <span className="text-xs font-normal text-slate-400">mm</span>
       </p>
+    </div>
+  );
+}
+
+function CategoryRow({
+  title,
+  value,
+  category,
+}: {
+  title: string;
+  value: string;
+  category: ReturnType<typeof classifyDailyRain>;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 px-3 py-2.5">
+      <div className="min-w-0">
+        <p className="text-xs text-slate-400">{title}</p>
+        <p className="text-sm font-semibold tabular-nums text-slate-900">{value}</p>
+      </div>
+      <RainCategoryBadge category={category} />
     </div>
   );
 }
@@ -74,7 +96,22 @@ export default function RainfallCard({
 
       {summary ? (
         <>
-          <div className="mt-4 rounded-2xl bg-cyan-50 px-4 py-3">
+          {/* Kategori menurut standar BMKG (lib/rainfallClass.ts). Angka pakai 2 desimal
+              supaya konsisten dengan batas kelas (mis. 19,96 tidak tampil "20,0"). */}
+          <div className="mt-4 space-y-2">
+            <CategoryRow
+              title="Hari ini (sejak 00:00 WIB)"
+              value={`${summary.acc_today.toFixed(2)} mm`}
+              category={classifyDailyRain(summary.acc_today)}
+            />
+            <CategoryRow
+              title="Intensitas 1 jam terakhir"
+              value={`${summary.acc_1h.toFixed(2)} mm/jam`}
+              category={classifyHourlyRain(summary.acc_1h)}
+            />
+          </div>
+
+          <div className="mt-2.5 rounded-2xl bg-cyan-50 px-4 py-3">
             <p className="text-xs text-slate-500">Curah Hujan (pembacaan terakhir)</p>
             <p className="mt-0.5 text-2xl font-semibold tabular-nums text-slate-900">
               {summary.rain_last_mm.toFixed(2)}{" "}

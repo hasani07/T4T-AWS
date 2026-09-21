@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Device, DeviceRainfall } from "@/lib/types";
 import { fetchDeviceRainfalls } from "@/lib/rainfall";
 import RainfallCard from "./RainfallCard";
+import RainfallLegend from "./RainfallLegend";
 
 // Sensor hujan kirim data tiap 1 menit; polling tiap 30 detik cukup untuk
 // menjaga akumulasi 1J/3J/6J/12J/24J tetap segar tanpa membebani database.
@@ -72,6 +73,8 @@ export default function RainfallCardGrid({
           />
         ))}
       </div>
+
+      <RainfallLegend />
     </div>
   );
 }
