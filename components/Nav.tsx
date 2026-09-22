@@ -10,6 +10,8 @@ import {
   Send,
   DatabaseBackup,
   CloudSun,
+  UploadCloud,
+  Terminal,
 } from "lucide-react";
 import { useNavigationProgress } from "./NavigationProgress";
 
@@ -21,6 +23,10 @@ const NAV_ITEMS = [
   { href: "/recommendations", label: "AI", icon: Sparkles },
   { href: "/reports", label: "Laporan", icon: Send },
   { href: "/backups", label: "Backup", icon: DatabaseBackup },
+  // Internal saja (tidak butuh login, tapi tidak dipromosikan ke publik):
+  // upload firmware OTA dan serial monitor jarak jauh untuk device rainfall.
+  { href: "/admin/firmware", label: "Firmware", icon: UploadCloud },
+  { href: "/rainfall-monitor", label: "Monitor", icon: Terminal },
 ];
 
 const TELEGRAM_CHANNEL_URL = "https://t.me/aws_t4t";
