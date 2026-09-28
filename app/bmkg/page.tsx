@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import { getSetting } from "@/lib/settings";
 import { fetchBmkgForecast, findNearestEntry } from "@/lib/bmkg";
+import { parseBmkgUtc } from "@/lib/bmkgTime";
 import PageShell from "@/components/PageShell";
 import AutoRefresher from "@/components/AutoRefresher";
 import BmkgCompareCard from "@/components/bmkg/BmkgCompareCard";
@@ -28,6 +29,30 @@ async function getLatestReading(deviceId: number): Promise<SensorReading | null>
   return data[0];
 }
 
+/**
+ * Kapan sistem kita PERTAMA kali melihat rilis BMKG ini di API (dicatat oleh
+ * cron ke tabel bmkg_releases). null kalau belum tercatat — misalnya cron
+ * belum aktif, tabelnya belum dibuat, atau rilis barunya baru muncul dan
+ * belum sempat dicek. Hanya membaca; tidak pernah menulis.
+ */
+async function getReleaseSeen(
+  deviceId: number,
+  analysisDate: string | null
+): Promise<{ firstSeenAt: string; isBaseline: boolean } | null> {
+  const ms = parseBmkgUtc(analysisDate);
+  if (ms === null) return null;
+
+  const { data, error } = await supabase
+    .from("bmkg_releases")
+    .select("first_seen_at, is_baseline")
+    .eq("device_id", deviceId)
+    .eq("analysis_utc", new Date(ms).toISOString())
+    .maybeSingle();
+
+  if (error || !data) return null;
+  return { firstSeenAt: String(data.first_seen_at), isBaseline: Boolean(data.is_baseline) };
+}
+
 export default async function BmkgPage() {
   const devices = await getDevices();
 
@@ -37,7 +62,8 @@ export default async function BmkgPage() {
       const latest = await getLatestReading(device.id);
       const forecast = adm4 ? await fetchBmkgForecast(adm4) : null;
       const nearest = forecast ? findNearestEntry(forecast.entries) : null;
-      return { device, adm4, latest, forecast, nearest };
+      const release = nearest ? await getReleaseSeen(device.id, nearest.analysisDate) : null;
+      return { device, adm4, latest, forecast, nearest, release };
     })
   );
 
@@ -73,7 +99,7 @@ export default async function BmkgPage() {
       </header>
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-        {cards.map(({ device, adm4, latest, forecast, nearest }) => (
+        {cards.map(({ device, adm4, latest, forecast, nearest, release }) => (
           <BmkgCompareCard
             key={device.id}
             device={device}
@@ -81,6 +107,7 @@ export default async function BmkgPage() {
             adm4={adm4}
             forecastLocation={forecast?.location ?? null}
             nearest={nearest}
+            release={release}
             hasForecastError={!!adm4 && !forecast}
           />
         ))}
@@ -88,8 +115,10 @@ export default async function BmkgPage() {
 
       <p className="mt-6 text-xs text-slate-400">
         Sumber data: BMKG (Badan Meteorologi, Klimatologi, dan Geofisika). Data
-        prakiraan diupdate BMKG sekitar 2x/hari, jadi wajar kalau tidak
-        persis sama dengan pembacaan sensor real-time.
+        prakiraan dirilis BMKG sekitar 2x/hari, jadi wajar kalau tidak
+        persis sama dengan pembacaan sensor real-time. &quot;Dirilis BMKG&quot;
+        adalah waktu rilis dari BMKG sendiri; &quot;Terdeteksi di API&quot; adalah
+        kapan sistem kami pertama kali melihat rilis itu (dicek tiap 5 menit).
       </p>
     </PageShell>
   );

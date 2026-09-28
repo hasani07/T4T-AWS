@@ -4,8 +4,10 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { SensorReading, Device } from "@/lib/types";
 import { WIND_DIRECTION_LABELS } from "@/lib/config";
-import { formatDateTime } from "@/lib/deviceStatus";
+import { formatDateTime, sensorTimestampToTrueUtcMs } from "@/lib/deviceStatus";
+import { formatDetection, formatDuration, formatWibFromUtcMs, parseBmkgUtc } from "@/lib/bmkgTime";
 import BmkgAdm4Setting from "./BmkgAdm4Setting";
+import BmkgDownload from "./BmkgDownload";
 import { CloudSun, Radio } from "lucide-react";
 import type { BmkgForecastEntry, BmkgLocation } from "@/lib/bmkg";
 
@@ -19,6 +21,7 @@ export default function BmkgCompareCard({
   adm4,
   forecastLocation,
   nearest,
+  release,
   hasForecastError,
 }: {
   device: Device;
@@ -26,6 +29,8 @@ export default function BmkgCompareCard({
   adm4: string;
   forecastLocation: BmkgLocation | null;
   nearest: BmkgForecastEntry | null;
+  // Kapan sistem kita pertama kali melihat rilis BMKG ini di API (tabel bmkg_releases).
+  release: { firstSeenAt: string; isBaseline: boolean } | null;
   hasForecastError: boolean;
 }) {
   const [latest, setLatest] = useState<SensorReading | null>(initialLatest);
@@ -52,6 +57,19 @@ export default function BmkgCompareCard({
       supabase.removeChannel(channel);
     };
   }, [device.id]);
+
+  // Waktu masing-masing sisi, supaya jelas data mana yang dibandingkan.
+  //  - Sensor: jam pembacaan terakhir.
+  //  - BMKG  : (1) jam SLOT yang diprakirakan, dan (2) kapan BMKG memproduksi
+  //            prakiraan itu (analysis_date). Keduanya beda: BMKG cuma
+  //            memperbarui ~2x/hari dan datanya per 3 jam.
+  const slotMs = nearest ? parseBmkgUtc(nearest.utcDatetime) : null;
+  const releasedMs = nearest ? parseBmkgUtc(nearest.analysisDate) : null;
+  const sensorMs = latest ? sensorTimestampToTrueUtcMs(latest.created_at) : null;
+  const timeGapMs = slotMs !== null && sensorMs !== null ? Math.abs(sensorMs - slotMs) : null;
+  const detectionLabel = release
+    ? formatDetection(release.firstSeenAt, releasedMs, release.isBaseline)
+    : null;
 
   return (
     <div className="rounded-3xl bg-white p-5 shadow-[0_2px_24px_rgba(15,23,42,0.06)]">
@@ -104,6 +122,11 @@ export default function BmkgCompareCard({
                   : "-"}
               </b>
             </p>
+            {latest && (
+              <p className="mt-2 border-t border-slate-200 pt-2 text-[11px] text-slate-500">
+                Diukur: <b className="text-slate-700">{formatDateTime(latest.created_at)}</b>
+              </p>
+            )}
           </div>
 
           <div className="rounded-2xl bg-sky-50 p-4">
@@ -122,6 +145,24 @@ export default function BmkgCompareCard({
             <p className="text-sm text-slate-900">
               Kondisi: <b>{nearest.weatherDesc}</b>
             </p>
+            <div className="mt-2 border-t border-sky-100 pt-2 text-[11px] text-sky-800/70">
+              <p>
+                Prakiraan untuk:{" "}
+                <b className="text-sky-900">
+                  {slotMs !== null ? formatWibFromUtcMs(slotMs) : "-"}
+                </b>
+              </p>
+              <p>
+                Dirilis BMKG:{" "}
+                <b className="text-sky-900">
+                  {releasedMs !== null ? formatWibFromUtcMs(releasedMs) : "-"}
+                </b>
+              </p>
+              <p>
+                Terdeteksi di API:{" "}
+                <b className="text-sky-900">{detectionLabel ?? "belum tercatat"}</b>
+              </p>
+            </div>
           </div>
         </div>
       )}
@@ -130,14 +171,18 @@ export default function BmkgCompareCard({
         <div className="mt-3 rounded-2xl bg-amber-50 p-3 text-xs text-amber-700">
           Selisih suhu: <b>{fmt(Math.abs(latest.temperature - nearest.temperature))}°C</b> ·
           Selisih kelembaban: <b>{fmt(Math.abs(latest.humidity - nearest.humidity), 0)}%</b>
+          {timeGapMs !== null && (
+            <>
+              {" "}
+              · Selisih waktu data: <b>{formatDuration(timeGapMs)}</b>
+            </>
+          )}
         </div>
       )}
 
-      {latest && (
-        <p className="mt-3 text-xs text-slate-400">
-          Sensor update terakhir: {formatDateTime(latest.created_at)}
-        </p>
-      )}
+      {/* Unduh data cukup butuh kode wilayah: data sensor tetap bisa diunduh
+          walau BMKG sedang gagal diambil. */}
+      {adm4 && <BmkgDownload deviceId={device.id} deviceType={device.type} />}
     </div>
   );
 }
