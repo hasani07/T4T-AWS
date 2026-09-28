@@ -12,6 +12,7 @@ import {
   CloudSun,
   UploadCloud,
   Terminal,
+  Smartphone,
 } from "lucide-react";
 import { useNavigationProgress } from "./NavigationProgress";
 import ThemeToggle from "./ThemeToggle";
@@ -20,6 +21,7 @@ const NAV_ITEMS = [
   { href: "/", label: "Dashboard", icon: LayoutGrid },
   { href: "/analytics", label: "Analitik", icon: BarChart3 },
   { href: "/bmkg", label: "BMKG", icon: CloudSun },
+  { href: "/kuota", label: "Kuota", icon: Smartphone },
   { href: "/download", label: "Unduh", icon: Download },
   { href: "/recommendations", label: "AI", icon: Sparkles },
   { href: "/reports", label: "Laporan", icon: Send },
