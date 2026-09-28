@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { SensorReading, Device } from "@/lib/types";
 import { WIND_DIRECTION_LABELS } from "@/lib/config";
 import { formatDateTime, sensorTimestampToTrueUtcMs } from "@/lib/deviceStatus";
+import { useLatestReadings } from "@/lib/useLatestReadings";
 import { formatDetection, formatDuration, formatWibFromUtcMs, parseBmkgUtc } from "@/lib/bmkgTime";
 import BmkgAdm4Setting from "./BmkgAdm4Setting";
 import BmkgDownload from "./BmkgDownload";
@@ -33,12 +34,16 @@ export default function BmkgCompareCard({
   release: { firstSeenAt: string; isBaseline: boolean } | null;
   hasForecastError: boolean;
 }) {
-  const [latest, setLatest] = useState<SensorReading | null>(initialLatest);
+  // Sisi "Sensor Kami": dijaga segar oleh polling 30 detik + ambil-ulang saat
+  // tab kembali aktif (lib/useLatestReadings), BUKAN cuma Realtime. Sebelumnya
+  // state ini hanya diisi sekali dari props dan Realtime; kalau koneksi
+  // Realtime putus, angka dan jamnya membeku walau halaman refresh tiap 2 menit.
+  const [readings, pushReading] = useLatestReadings({ [device.id]: initialLatest }, [device.id]);
+  const latest: SensorReading | null = readings[device.id] ?? null;
 
   useEffect(() => {
-    // Sama seperti SensorCardGrid di Dashboard: begitu ada baris baru
-    // masuk ke tabel sensors, langsung update tanpa perlu refresh/nunggu
-    // timer sama sekali.
+    // Begitu ada baris baru masuk ke tabel sensors, langsung tampil tanpa
+    // menunggu polling berikutnya.
     const channel = supabase
       .channel(`bmkg-sensor-${device.id}`)
       .on(
@@ -47,7 +52,7 @@ export default function BmkgCompareCard({
         (payload) => {
           const newReading = payload.new as SensorReading;
           if (newReading.device_id === device.id) {
-            setLatest(newReading);
+            pushReading(newReading);
           }
         }
       )
@@ -56,7 +61,7 @@ export default function BmkgCompareCard({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [device.id]);
+  }, [device.id, pushReading]);
 
   // Waktu masing-masing sisi, supaya jelas data mana yang dibandingkan.
   //  - Sensor: jam pembacaan terakhir.

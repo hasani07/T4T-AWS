@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { DeviceWithLatestReading, SensorReading } from "@/lib/types";
+import { LatestMap } from "@/lib/sensorLatest";
+import { useLatestReadings } from "@/lib/useLatestReadings";
 import SensorCard from "./SensorCard";
 
 export default function SensorCardGrid({
@@ -10,7 +12,21 @@ export default function SensorCardGrid({
 }: {
   initialData: DeviceWithLatestReading[];
 }) {
-  const [devices, setDevices] = useState<DeviceWithLatestReading[]>(initialData);
+  const initialMap: LatestMap = {};
+  for (const d of initialData) initialMap[d.id] = d.latest;
+
+  // Data sensor dijaga segar oleh polling 30 detik (sama seperti kartu curah
+  // hujan) + ambil-ulang saat tab kembali aktif. Supabase Realtime di bawah
+  // tetap dipakai supaya data baru muncul seketika, tapi TIDAK lagi jadi satu-
+  // satunya sumber: kalau koneksi Realtime putus, kartu tetap pulih sendiri.
+  const [readings, pushReading] = useLatestReadings(
+    initialMap,
+    initialData.map((d) => d.id)
+  );
+  const devices: DeviceWithLatestReading[] = initialData.map((d) => ({
+    ...d,
+    latest: readings[d.id] ?? null,
+  }));
 
   // "Update terakhir" (relatif & jam) dihitung dari Date.now() saat render.
   // Tanpa ini, teksnya akan NYANGKUT di nilai saat halaman pertama dimuat
@@ -27,21 +43,15 @@ export default function SensorCardGrid({
 
   useEffect(() => {
     // Subscribe ke INSERT baru di tabel `sensors` — hanya mendengarkan
-    // (read), tidak pernah menulis apapun ke database. Firmware sudah
-    // kirim hasil rata-rata 5 menit, jadi payload.new dipakai apa adanya
-    // tanpa perlu dihitung ulang di sisi web.
+    // (read), tidak pernah menulis apapun ke database. Payload dipakai apa
+    // adanya (hanya diterima kalau lebih baru dari yang sudah tampil).
     const channel = supabase
       .channel("sensors-realtime")
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "sensors" },
         (payload) => {
-          const newReading = payload.new as SensorReading;
-          setDevices((prev) =>
-            prev.map((d) =>
-              d.id === newReading.device_id ? { ...d, latest: newReading } : d
-            )
-          );
+          pushReading(payload.new as SensorReading);
         }
       )
       .subscribe();
@@ -49,7 +59,7 @@ export default function SensorCardGrid({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [pushReading]);
 
   if (devices.length === 0) {
     return (

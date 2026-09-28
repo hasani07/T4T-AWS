@@ -3,6 +3,7 @@ import { Device, DeviceRainfall, DeviceWithLatestReading } from "@/lib/types";
 import SensorCardGrid from "@/components/SensorCardGrid";
 import RainfallCardGrid from "@/components/RainfallCardGrid";
 import DeviceStatusOverview from "@/components/DeviceStatusOverview";
+import DeviceUptimePanel from "@/components/DeviceUptimePanel";
 import { LastSeen } from "@/lib/deviceLastSeen";
 import { fetchDeviceRainfalls } from "@/lib/rainfall";
 import PageShell from "@/components/PageShell";
@@ -161,6 +162,8 @@ export default async function DashboardPage() {
       </header>
 
       <DeviceStatusOverview devices={devices} initial={initialLastSeen} />
+
+      <DeviceUptimePanel devices={devices} />
 
       <div className="mb-6 grid grid-cols-2 gap-3 md:flex md:flex-wrap">
         {avgTemp !== null && (
