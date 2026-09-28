@@ -152,9 +152,12 @@ function UptimeItem({ item, state, period }: { item: Item; state: ItemState | un
           {data.recentOutages.length > 0 && (
             <details className="mt-2 text-xs text-slate-500">
               <summary className="cursor-pointer select-none text-slate-500">
-                Gangguan terbaru ({data.recentOutages.length})
+                Gangguan terbaru ({data.recentOutages.length}
+                {data.outageCount > data.recentOutages.length ? ` dari ${data.outageCount}` : ""})
               </summary>
-              <ul className="mt-2 space-y-1">
+              {/* Tinggi dibatasi (~7 baris) dan bisa di-scroll, supaya panel tidak
+                  memanjang ke bawah walau gangguannya banyak. */}
+              <ul className="mt-2 max-h-40 space-y-1 overflow-y-auto pr-1">
                 {data.recentOutages.map((o) => (
                   <li key={o.start} className="flex flex-wrap justify-between gap-x-3 tabular-nums">
                     <span>
