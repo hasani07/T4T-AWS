@@ -36,7 +36,7 @@ function parseSensorTimestampParts(iso: string) {
  * online/offline) — supaya hasilnya akurat dibanding jam sekarang yang
  * sebenarnya.
  */
-function sensorTimestampToTrueUtcMs(iso: string): number {
+export function sensorTimestampToTrueUtcMs(iso: string): number {
   const p = parseSensorTimestampParts(iso);
   return (
     Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second) -
