@@ -94,13 +94,13 @@ export default function DeviceStatusOverview({
   const onlineCount = items.filter((i) => i.online).length;
   const summaryColor =
     onlineCount === items.length
-      ? "bg-emerald-50 text-emerald-700"
+      ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
       : onlineCount === 0
-      ? "bg-rose-50 text-rose-700"
-      : "bg-amber-50 text-amber-700";
+      ? "bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300"
+      : "bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300";
 
   return (
-    <div className="mb-6 rounded-3xl bg-white p-5 shadow-[0_2px_24px_rgba(15,23,42,0.06)]">
+    <div className="mb-6 rounded-3xl bg-surface p-5 shadow-[0_2px_24px_rgba(15,23,42,0.06)]">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold text-slate-900">Status Perangkat</h2>
         <span

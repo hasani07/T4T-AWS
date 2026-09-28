@@ -77,7 +77,7 @@ export default function BmkgCompareCard({
     : null;
 
   return (
-    <div className="rounded-3xl bg-white p-5 shadow-[0_2px_24px_rgba(15,23,42,0.06)]">
+    <div className="rounded-3xl bg-surface p-5 shadow-[0_2px_24px_rgba(15,23,42,0.06)]">
       <h2 className="text-base font-semibold text-slate-900">{device.type}</h2>
 
       <div className="mt-3">
@@ -134,8 +134,8 @@ export default function BmkgCompareCard({
             )}
           </div>
 
-          <div className="rounded-2xl bg-sky-50 p-4">
-            <div className="mb-2 flex items-center gap-2 text-xs font-medium text-sky-600">
+          <div className="rounded-2xl bg-sky-50 dark:bg-sky-500/10 p-4">
+            <div className="mb-2 flex items-center gap-2 text-xs font-medium text-sky-600 dark:text-sky-400">
               <CloudSun size={14} /> BMKG
             </div>
             <p className="text-sm text-slate-900">
@@ -150,22 +150,22 @@ export default function BmkgCompareCard({
             <p className="text-sm text-slate-900">
               Kondisi: <b>{nearest.weatherDesc}</b>
             </p>
-            <div className="mt-2 border-t border-sky-100 pt-2 text-[11px] text-sky-800/70">
+            <div className="mt-2 border-t border-sky-100 dark:border-sky-500/20 pt-2 text-[11px] text-sky-800/70 dark:text-sky-200/70">
               <p>
                 Prakiraan untuk:{" "}
-                <b className="text-sky-900">
+                <b className="text-sky-900 dark:text-sky-200">
                   {slotMs !== null ? formatWibFromUtcMs(slotMs) : "-"}
                 </b>
               </p>
               <p>
                 Dirilis BMKG:{" "}
-                <b className="text-sky-900">
+                <b className="text-sky-900 dark:text-sky-200">
                   {releasedMs !== null ? formatWibFromUtcMs(releasedMs) : "-"}
                 </b>
               </p>
               <p>
                 Terdeteksi di API:{" "}
-                <b className="text-sky-900">{detectionLabel ?? "belum tercatat"}</b>
+                <b className="text-sky-900 dark:text-sky-200">{detectionLabel ?? "belum tercatat"}</b>
               </p>
             </div>
           </div>
@@ -173,7 +173,7 @@ export default function BmkgCompareCard({
       )}
 
       {nearest && latest && (
-        <div className="mt-3 rounded-2xl bg-amber-50 p-3 text-xs text-amber-700">
+        <div className="mt-3 rounded-2xl bg-amber-50 dark:bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-300">
           Selisih suhu: <b>{fmt(Math.abs(latest.temperature - nearest.temperature))}°C</b> ·
           Selisih kelembaban: <b>{fmt(Math.abs(latest.humidity - nearest.humidity), 0)}%</b>
           {timeGapMs !== null && (

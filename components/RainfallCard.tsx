@@ -26,7 +26,7 @@ function AccumulationCell({
   return (
     <div
       className={`rounded-2xl px-3 py-2.5 ${
-        highlight ? "bg-cyan-50" : "bg-slate-50"
+        highlight ? "bg-cyan-50 dark:bg-cyan-500/10" : "bg-slate-50"
       }`}
     >
       <p className="text-xs text-slate-400">{label}</p>
@@ -75,7 +75,7 @@ export default function RainfallCard({
   const online = isDeviceOnline(lastReadingAt, RAINFALL_OFFLINE_THRESHOLD_MINUTES);
 
   return (
-    <div className="rounded-3xl bg-white p-5 shadow-[0_2px_24px_rgba(15,23,42,0.06)]">
+    <div className="rounded-3xl bg-surface p-5 shadow-[0_2px_24px_rgba(15,23,42,0.06)]">
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-2.5">
           <span
@@ -111,7 +111,7 @@ export default function RainfallCard({
             />
           </div>
 
-          <div className="mt-2.5 rounded-2xl bg-cyan-50 px-4 py-3">
+          <div className="mt-2.5 rounded-2xl bg-cyan-50 dark:bg-cyan-500/10 px-4 py-3">
             <p className="text-xs text-slate-500">Curah Hujan (pembacaan terakhir)</p>
             <p className="mt-0.5 text-2xl font-semibold tabular-nums text-slate-900">
               {summary.rain_last_mm.toFixed(2)}{" "}

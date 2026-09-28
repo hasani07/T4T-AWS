@@ -12,9 +12,9 @@ interface GeneratedResult {
 
 function RiskBadge({ level }: { level: string }) {
   const styles: Record<string, string> = {
-    aman: "bg-emerald-50 text-emerald-700",
-    waspada: "bg-amber-50 text-amber-700",
-    kritis: "bg-rose-50 text-rose-700",
+    aman: "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+    waspada: "bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300",
+    kritis: "bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300",
   };
   return (
     <span
@@ -55,17 +55,17 @@ export default function RecommendationsClient() {
       <button
         onClick={handleGenerate}
         disabled={loading}
-        className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+        className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-on-strong transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {loading ? "Menghasilkan rekomendasi..." : "Generate Rekomendasi Sekarang"}
       </button>
 
-      {error && <p className="text-sm text-rose-600">{error}</p>}
+      {error && <p className="text-sm text-rose-600 dark:text-rose-400">{error}</p>}
 
       {results && (
         <div className="space-y-3">
           {results.map((r) => (
-            <div key={r.deviceId} className="rounded-2xl border border-slate-200 bg-white p-4">
+            <div key={r.deviceId} className="rounded-2xl border border-slate-200 bg-surface p-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-slate-900">{r.deviceType}</h3>
                 <RiskBadge level={r.riskLevel} />

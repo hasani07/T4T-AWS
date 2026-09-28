@@ -44,11 +44,11 @@ export default function BmkgAdm4Setting({
       <button
         onClick={handleSave}
         disabled={saving}
-        className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+        className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-medium text-on-strong transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {saving ? "Menyimpan..." : "Simpan"}
       </button>
-      {error && <p className="w-full text-xs text-rose-600">{error}</p>}
+      {error && <p className="w-full text-xs text-rose-600 dark:text-rose-400">{error}</p>}
     </div>
   );
 }

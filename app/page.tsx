@@ -69,7 +69,7 @@ function SummaryPill({
   label: string;
 }) {
   return (
-    <div className="flex items-center gap-2.5 rounded-2xl bg-white px-3 py-3 shadow-[0_2px_20px_rgba(15,23,42,0.06)] sm:gap-3 sm:px-4">
+    <div className="flex items-center gap-2.5 rounded-2xl bg-surface px-3 py-3 shadow-[0_2px_20px_rgba(15,23,42,0.06)] sm:gap-3 sm:px-4">
       <span
         className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white sm:h-10 sm:w-10"
         style={{ backgroundColor: color }}
@@ -208,7 +208,7 @@ export default async function DashboardPage() {
         <TelegramJoinCard />
       </div>
 
-      <div className="relative z-0 rounded-3xl bg-white p-5 shadow-[0_2px_24px_rgba(15,23,42,0.06)]">
+      <div className="relative z-0 rounded-3xl bg-surface p-5 shadow-[0_2px_24px_rgba(15,23,42,0.06)]">
         <h2 className="mb-3 text-sm font-semibold text-slate-900">Lokasi Device</h2>
         <DeviceMap devices={mapMarkers} />
       </div>

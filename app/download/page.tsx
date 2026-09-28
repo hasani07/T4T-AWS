@@ -41,14 +41,14 @@ export default async function DownloadPage() {
           </p>
         ) : (
           <div className="space-y-6">
-            <div className="rounded-2xl border border-slate-200 bg-white p-5">
+            <div className="rounded-2xl border border-slate-200 bg-surface p-5">
               <h2 className="mb-3 text-sm font-semibold text-slate-900">
                 Laporan Excel (Ringkasan + Grafik)
               </h2>
               <ExcelReportClient devices={devices} />
             </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-white p-5">
+            <div className="rounded-2xl border border-slate-200 bg-surface p-5">
               <h2 className="mb-3 text-sm font-semibold text-slate-900">
                 CSV Mentah (Data Apa Adanya)
               </h2>

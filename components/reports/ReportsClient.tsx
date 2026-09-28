@@ -52,7 +52,7 @@ export default function ReportsClient({ initialIntervalDays }: { initialInterval
 
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl border border-slate-200 bg-white p-4">
+      <div className="rounded-2xl border border-slate-200 bg-surface p-4">
         <h3 className="text-sm font-semibold text-slate-900">Interval Otomatis</h3>
         <p className="mt-1 text-xs text-slate-500">
           Laporan otomatis dicek setiap pagi, tapi baru benar-benar dikirim
@@ -71,18 +71,18 @@ export default function ReportsClient({ initialIntervalDays }: { initialInterval
           <button
             onClick={handleSaveInterval}
             disabled={savingInterval}
-            className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-on-strong transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {savingInterval ? "Menyimpan..." : "Simpan"}
           </button>
         </div>
         {intervalSaved && (
-          <p className="mt-2 text-sm text-emerald-600">Interval berhasil disimpan.</p>
+          <p className="mt-2 text-sm text-emerald-600 dark:text-emerald-400">Interval berhasil disimpan.</p>
         )}
-        {intervalError && <p className="mt-2 text-sm text-rose-600">{intervalError}</p>}
+        {intervalError && <p className="mt-2 text-sm text-rose-600 dark:text-rose-400">{intervalError}</p>}
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-4">
+      <div className="rounded-2xl border border-slate-200 bg-surface p-4">
         <h3 className="text-sm font-semibold text-slate-900">Generate Manual</h3>
         <p className="mt-1 text-xs text-slate-500">
           Kirim laporan sekarang juga ke Telegram, di luar jadwal otomatis.
@@ -90,14 +90,14 @@ export default function ReportsClient({ initialIntervalDays }: { initialInterval
         <button
           onClick={handleGenerate}
           disabled={generating}
-          className="mt-3 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+          className="mt-3 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-on-strong transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {generating ? "Mengirim ke Telegram..." : "Generate & Kirim Sekarang"}
         </button>
         {generateSuccess && (
-          <p className="mt-2 text-sm text-emerald-600">{generateSuccess}</p>
+          <p className="mt-2 text-sm text-emerald-600 dark:text-emerald-400">{generateSuccess}</p>
         )}
-        {generateError && <p className="mt-2 text-sm text-rose-600">{generateError}</p>}
+        {generateError && <p className="mt-2 text-sm text-rose-600 dark:text-rose-400">{generateError}</p>}
       </div>
     </div>
   );

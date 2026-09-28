@@ -122,7 +122,7 @@ export default function RainfallConsole() {
         )}
 
         {running && (
-          <span className="inline-flex items-center gap-1.5 text-xs text-emerald-700">
+          <span className="inline-flex items-center gap-1.5 text-xs text-emerald-700 dark:text-emerald-300">
             <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
             memantau...
           </span>
@@ -133,7 +133,7 @@ export default function RainfallConsole() {
 
       <div
         ref={boxRef}
-        className="h-96 overflow-y-auto rounded-xl bg-slate-950 p-4 font-mono text-xs text-emerald-400"
+        className="h-96 overflow-y-auto rounded-xl bg-[#020617] p-4 font-mono text-xs text-emerald-400"
       >
         {rows.length === 0 ? (
           <p className="text-slate-500">

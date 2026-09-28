@@ -16,7 +16,7 @@ export default function ReportHistory({ rows }: { rows: HistoryRow[] }) {
   return (
     <div className="space-y-3">
       {rows.map((row) => (
-        <div key={row.id} className="rounded-2xl border border-slate-200 bg-white p-4">
+        <div key={row.id} className="rounded-2xl border border-slate-200 bg-surface p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <span className="text-sm font-semibold text-slate-900">
@@ -25,8 +25,8 @@ export default function ReportHistory({ rows }: { rows: HistoryRow[] }) {
               <span
                 className={`ml-2 rounded-full px-2 py-0.5 text-[10px] font-medium ${
                   row.status === "sent"
-                    ? "bg-emerald-50 text-emerald-700"
-                    : "bg-rose-50 text-rose-700"
+                    ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                    : "bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300"
                 }`}
               >
                 {row.status === "sent" ? "Terkirim" : "Gagal"}

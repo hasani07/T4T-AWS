@@ -38,7 +38,7 @@ export default function QuotaSettings({
   }
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4">
+    <div className="rounded-2xl border border-slate-200 bg-surface p-4">
       <h3 className="text-sm font-semibold text-slate-900">Kapasitas Database</h3>
 
       <div className="mt-3">
@@ -46,7 +46,7 @@ export default function QuotaSettings({
           <span className="text-slate-600">
             {dbSizeMb.toFixed(1)} MB / {quotaMb} MB
           </span>
-          <span className={isWarning ? "font-medium text-amber-600" : "font-medium text-emerald-600"}>
+          <span className={isWarning ? "font-medium text-amber-600 dark:text-amber-400" : "font-medium text-emerald-600 dark:text-emerald-400"}>
             {usagePct.toFixed(1)}%
           </span>
         </div>
@@ -77,13 +77,13 @@ export default function QuotaSettings({
           <button
             onClick={handleSave}
             disabled={saving}
-            className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-on-strong transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {saving ? "Menyimpan..." : "Simpan"}
           </button>
         </div>
-        {saved && <p className="mt-2 text-sm text-emerald-600">Kuota berhasil disimpan.</p>}
-        {error && <p className="mt-2 text-sm text-rose-600">{error}</p>}
+        {saved && <p className="mt-2 text-sm text-emerald-600 dark:text-emerald-400">Kuota berhasil disimpan.</p>}
+        {error && <p className="mt-2 text-sm text-rose-600 dark:text-rose-400">{error}</p>}
       </div>
     </div>
   );

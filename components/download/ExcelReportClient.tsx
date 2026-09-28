@@ -85,8 +85,8 @@ export default function ExcelReportClient({ devices }: { devices: Device[] }) {
               onClick={() => setGranularity(opt.value)}
               className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
                 granularity === opt.value
-                  ? "bg-slate-900 text-white"
-                  : "border border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
+                  ? "bg-slate-900 text-on-strong"
+                  : "border border-slate-300 bg-surface text-slate-600 hover:bg-slate-50"
               }`}
             >
               {opt.label}
@@ -112,8 +112,8 @@ export default function ExcelReportClient({ devices }: { devices: Device[] }) {
         {loading ? "Menyiapkan Excel..." : "Export ke Excel (dengan Grafik)"}
       </button>
 
-      {error && <p className="text-sm text-rose-600">{error}</p>}
-      {success && <p className="text-sm text-emerald-600">{success}</p>}
+      {error && <p className="text-sm text-rose-600 dark:text-rose-400">{error}</p>}
+      {success && <p className="text-sm text-emerald-600 dark:text-emerald-400">{success}</p>}
 
       <p className="text-xs text-slate-400">
         Isi file: tabel ringkasan (min/max/rata-rata suhu &amp; kelembaban, rata-rata

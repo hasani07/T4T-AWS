@@ -16,7 +16,7 @@ function TelegramIcon({ size = 20 }: { size?: number }) {
 
 export default function TelegramJoinCard() {
   return (
-    <div className="mb-6 flex flex-col items-start justify-between gap-4 rounded-3xl bg-white p-5 shadow-[0_2px_24px_rgba(15,23,42,0.06)] sm:flex-row sm:items-center">
+    <div className="mb-6 flex flex-col items-start justify-between gap-4 rounded-3xl bg-surface p-5 shadow-[0_2px_24px_rgba(15,23,42,0.06)] sm:flex-row sm:items-center">
       <div className="flex items-center gap-3">
         <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-sky-500 text-white">
           <TelegramIcon size={20} />
@@ -34,7 +34,7 @@ export default function TelegramJoinCard() {
         href={TELEGRAM_CHANNEL_URL}
         target="_blank"
         rel="noopener noreferrer"
-        className="shrink-0 rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+        className="shrink-0 rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-on-strong transition hover:bg-slate-800"
       >
         Join Channel
       </a>

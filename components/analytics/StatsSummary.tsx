@@ -9,7 +9,7 @@ function DeltaBadge({ pct }: { pct: number | null }) {
   const rounded = Math.abs(pct).toFixed(1);
   return (
     <span
-      className={`text-xs font-medium ${up ? "text-sky-600" : "text-orange-600"}`}
+      className={`text-xs font-medium ${up ? "text-sky-600 dark:text-sky-400" : "text-orange-600 dark:text-orange-400"}`}
     >
       {up ? "▲" : "▼"} {rounded}%
     </span>
@@ -32,7 +32,7 @@ function StatCard({
   deltaAvg: number | null;
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4">
+    <div className="rounded-2xl border border-slate-200 bg-surface p-4">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-slate-900">{label}</h3>
         <DeltaBadge pct={deltaAvg} />
@@ -96,7 +96,7 @@ export default function StatsSummary({
           )}
         />
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-4">
+        <div className="rounded-2xl border border-slate-200 bg-surface p-4">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-slate-900">
               Curah Hujan (Total)
@@ -120,7 +120,7 @@ export default function StatsSummary({
         </div>
       </div>
 
-      <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
+      <div className="mt-4 rounded-2xl border border-slate-200 bg-surface p-4">
         <h3 className="text-sm font-semibold text-slate-900">
           Arah Angin Dominan
         </h3>
@@ -133,7 +133,7 @@ export default function StatsSummary({
       </div>
 
       {current.excludedReadings > 0 && (
-        <p className="mt-3 text-xs text-amber-600">
+        <p className="mt-3 text-xs text-amber-600 dark:text-amber-400">
           ⚠️ {current.excludedReadings} dari {current.totalReadings} baris data
           pada periode ini dikecualikan dari perhitungan karena nilainya di
           luar rentang wajar (kemungkinan glitch sensor).

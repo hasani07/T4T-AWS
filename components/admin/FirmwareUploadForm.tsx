@@ -118,20 +118,20 @@ export default function FirmwareUploadForm() {
       <button
         type="submit"
         disabled={result.kind === "loading"}
-        className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+        className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-on-strong disabled:opacity-50"
       >
         {result.kind === "loading" ? "Mengunggah..." : "Upload firmware"}
       </button>
 
       {result.kind === "success" && (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+        <div className="rounded-lg border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 p-3 text-sm text-emerald-800 dark:text-emerald-200">
           Berhasil diupload. MD5: <code className="break-all">{result.md5}</code>
           <br />
           ESP akan mendeteksinya dalam maksimal 2 menit dan otomatis mengunduh + restart.
         </div>
       )}
       {result.kind === "error" && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{result.message}</div>
+        <div className="rounded-lg border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10 p-3 text-sm text-red-800 dark:text-red-200">{result.message}</div>
       )}
     </form>
   );

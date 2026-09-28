@@ -2,6 +2,58 @@
 @tailwind components;
 @tailwind utilities;
 
+/* =====================================================================
+   Warna tema. Nilai = "R G B" (tanpa koma) supaya bisa dipakai bersama
+   modifier transparansi Tailwind. Mode terang = default Tailwind (tidak
+   berubah dari sebelum ada mode gelap). Mengubah tampilan mode gelap cukup
+   dengan mengedit nilai di blok .dark di bawah.
+   ===================================================================== */
+:root {
+  color-scheme: light;
+
+  --page: 241 240 247; /* #F1F0F7 */
+  --surface: 255 255 255;
+  --on-strong: 255 255 255;
+  --body-text: 30 27 46; /* #1E1B2E */
+
+  --slate-50: 248 250 252;
+  --slate-100: 241 245 249;
+  --slate-200: 226 232 240;
+  --slate-300: 203 213 225;
+  --slate-400: 148 163 184;
+  --slate-500: 100 116 139;
+  --slate-600: 71 85 105;
+  --slate-700: 51 65 85;
+  --slate-800: 30 41 59;
+  --slate-900: 15 23 42;
+  --slate-950: 2 6 23;
+}
+
+/* Skala slate DIBALIK: 900 = teks/isi terang, 50 = lapisan gelap paling halus.
+   Jadi text-slate-900 menjadi terang, bg-slate-900 (tombol utama) menjadi
+   terang (dipasangkan dengan text-on-strong yang gelap), border-slate-200
+   menjadi garis gelap, dan seterusnya. */
+.dark {
+  color-scheme: dark; /* scrollbar, <select>, input tanggal ikut gelap */
+
+  --page: 10 12 17; /* #0A0C11 */
+  --surface: 23 26 36; /* #171A24 */
+  --on-strong: 15 23 42;
+  --body-text: 226 232 240;
+
+  --slate-50: 31 35 48; /* tile di dalam kartu */
+  --slate-100: 40 45 60; /* hover, track */
+  --slate-200: 52 58 76; /* border */
+  --slate-300: 69 76 101; /* border input */
+  --slate-400: 142 153 176;
+  --slate-500: 158 168 188;
+  --slate-600: 182 190 206;
+  --slate-700: 204 210 223;
+  --slate-800: 223 228 237;
+  --slate-900: 241 245 249;
+  --slate-950: 2 6 23;
+}
+
 html,
 body {
   height: 100%;
@@ -9,6 +61,58 @@ body {
 
 body {
   font-family: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
-  background-color: #f1f0f7;
-  color: #1e1b2e;
+  background-color: rgb(var(--page));
+  color: rgb(var(--body-text));
+}
+
+/* =====================================================================
+   Grafik (Recharts): warna bawaannya di-hardcode terang, jadi di mode gelap
+   ditimpa lewat CSS (menimpa atribut SVG dan style inline bawaan).
+   ===================================================================== */
+.dark .recharts-cartesian-grid line {
+  stroke: rgb(var(--slate-200));
+}
+.dark .recharts-cartesian-axis-tick-value {
+  fill: rgb(var(--slate-500));
+}
+.dark .recharts-cartesian-axis-line,
+.dark .recharts-cartesian-axis-tick-line {
+  stroke: rgb(var(--slate-300));
+}
+.dark .recharts-default-tooltip {
+  background-color: rgb(var(--surface)) !important;
+  border-color: rgb(var(--slate-200)) !important;
+}
+.dark .recharts-tooltip-cursor {
+  fill: rgb(var(--slate-200));
+  stroke: rgb(var(--slate-300));
+}
+
+/* =====================================================================
+   Peta (Leaflet): ubin OpenStreetMap hanya tersedia versi terang, jadi
+   dibalik dengan filter (khusus ubin; marker dan popup tidak ikut).
+   ===================================================================== */
+.dark .leaflet-tile-pane {
+  filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.92) saturate(0.85);
+}
+.dark .leaflet-container {
+  background: rgb(var(--slate-100));
+}
+.dark .leaflet-popup-content-wrapper,
+.dark .leaflet-popup-tip {
+  background: rgb(var(--surface));
+  color: rgb(var(--slate-900));
+}
+.dark .leaflet-bar a,
+.dark .leaflet-bar a:hover {
+  background-color: rgb(var(--surface));
+  color: rgb(var(--slate-900));
+  border-bottom-color: rgb(var(--slate-200));
+}
+.dark .leaflet-control-attribution {
+  background: rgb(var(--surface) / 0.8);
+  color: rgb(var(--slate-500));
+}
+.dark .leaflet-control-attribution a {
+  color: rgb(var(--slate-600));
 }

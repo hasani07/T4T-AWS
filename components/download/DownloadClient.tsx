@@ -115,22 +115,22 @@ export default function DownloadClient({ devices }: { devices: Device[] }) {
         <button
           onClick={() => handleDownload("sensor")}
           disabled={loading}
-          className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-on-strong transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {loading ? "Menyiapkan file..." : "Download CSV Cuaca"}
         </button>
         <button
           onClick={() => handleDownload("rainfall")}
           disabled={loading}
-          className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-lg border border-slate-300 bg-surface px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {loading ? "Menyiapkan file..." : "Download CSV Curah Hujan"}
         </button>
       </div>
 
-      {errorMsg && <p className="text-sm text-rose-600">{errorMsg}</p>}
+      {errorMsg && <p className="text-sm text-rose-600 dark:text-rose-400">{errorMsg}</p>}
       {lastDownloadInfo && (
-        <p className="text-sm text-emerald-600">{lastDownloadInfo}</p>
+        <p className="text-sm text-emerald-600 dark:text-emerald-400">{lastDownloadInfo}</p>
       )}
 
       <p className="text-xs text-slate-400">

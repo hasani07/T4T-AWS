@@ -158,7 +158,7 @@ export default function AnalyticsClient({ devices }: { devices: Device[] }) {
         </div>
       </div>
 
-      {errorMsg && <p className="text-sm text-rose-600">{errorMsg}</p>}
+      {errorMsg && <p className="text-sm text-rose-600 dark:text-rose-400">{errorMsg}</p>}
       {loading && <p className="text-sm text-slate-500">Memuat data...</p>}
 
       {!loading && currentStats && (

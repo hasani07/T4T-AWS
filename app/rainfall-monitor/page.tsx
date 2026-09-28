@@ -16,7 +16,7 @@ export default function RainfallMonitorPage() {
         </p>
       </header>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-5">
+      <div className="rounded-2xl border border-slate-200 bg-surface p-5">
         <RainfallConsole />
       </div>
     </PageShell>

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Nav from "@/components/Nav";
 import { NavigationProgressProvider } from "@/components/NavigationProgress";
+import { THEME_INIT_SCRIPT } from "@/lib/theme";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -36,8 +37,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="id">
+    // suppressHydrationWarning: skrip di <head> menambah kelas "dark" ke <html>
+    // sebelum React berjalan, jadi atribut class server dan klien memang beda.
+    <html lang="id" suppressHydrationWarning>
       <head>
+        {/* Tema (terang/gelap) diterapkan SEBELUM halaman digambar supaya tidak
+            ada kilatan terang saat halaman gelap dimuat. */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link

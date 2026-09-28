@@ -91,9 +91,9 @@ export default function BmkgDownload({
   }
 
   const noticeStyle: Record<Notice["kind"], string> = {
-    ok: "bg-emerald-50 text-emerald-700",
-    warn: "bg-amber-50 text-amber-700",
-    error: "bg-rose-50 text-rose-700",
+    ok: "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+    warn: "bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300",
+    error: "bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300",
   };
 
   return (
@@ -104,7 +104,7 @@ export default function BmkgDownload({
           onChange={(e) => setRange(e.target.value as BmkgExportRange)}
           disabled={busy}
           aria-label="Rentang data yang diunduh"
-          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 disabled:opacity-50"
+          className="rounded-xl border border-slate-200 bg-surface px-3 py-2 text-sm text-slate-700 disabled:opacity-50"
         >
           {BMKG_EXPORT_RANGES.map((r) => (
             <option key={r.value} value={r.value}>
@@ -117,7 +117,7 @@ export default function BmkgDownload({
           type="button"
           onClick={handleDownload}
           disabled={busy}
-          className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-on-strong disabled:opacity-50"
         >
           <Download size={14} />
           {busy ? "Menyiapkan..." : "Unduh data (CSV)"}

@@ -65,7 +65,7 @@ export default function TrendChart({
 
   if (readings.length === 0) {
     return (
-      <div className="rounded-2xl border border-slate-200 bg-white p-4">
+      <div className="rounded-2xl border border-slate-200 bg-surface p-4">
         <p className="text-sm text-slate-500">
           Tidak ada data untuk ditampilkan pada grafik.
         </p>
@@ -101,7 +101,7 @@ export default function TrendChart({
   const anyVisible = METRICS.some((m) => visible[m.key]);
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4">
+    <div className="rounded-2xl border border-slate-200 bg-surface p-4">
       <h3 className="mb-2 text-sm font-semibold text-slate-900">Tren Sensor</h3>
 
       <div className="mb-3 flex flex-wrap gap-3">

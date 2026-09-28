@@ -14,6 +14,7 @@ import {
   Terminal,
 } from "lucide-react";
 import { useNavigationProgress } from "./NavigationProgress";
+import ThemeToggle from "./ThemeToggle";
 
 const NAV_ITEMS = [
   { href: "/", label: "Dashboard", icon: LayoutGrid },
@@ -51,8 +52,8 @@ export default function Nav() {
 
   return (
     <Fragment>
-      <aside className="fixed inset-y-0 left-0 z-50 hidden w-20 flex-col items-center gap-2 border-r border-slate-200/60 bg-white py-6 md:flex">
-        <div className="mb-8 flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-900 text-[11px] font-bold tracking-tight text-white">
+      <aside className="fixed inset-y-0 left-0 z-50 hidden w-20 flex-col items-center gap-2 border-r border-slate-200/60 bg-surface py-6 md:flex">
+        <div className="mb-8 flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-900 text-[11px] font-bold tracking-tight text-on-strong">
           T4T
         </div>
         <nav className="flex flex-1 flex-col items-center gap-1.5">
@@ -66,7 +67,7 @@ export default function Nav() {
                 title={item.label}
                 className={`group flex h-12 w-12 flex-col items-center justify-center gap-0.5 rounded-2xl transition ${
                   active
-                    ? "bg-slate-900 text-white"
+                    ? "bg-slate-900 text-on-strong"
                     : "text-slate-400 hover:bg-slate-100 hover:text-slate-600"
                 }`}
               >
@@ -76,19 +77,21 @@ export default function Nav() {
           })}
         </nav>
 
+        <ThemeToggle variant="sidebar" />
+
         <a
           href={TELEGRAM_CHANNEL_URL}
           target="_blank"
           rel="noopener noreferrer"
           title="Join Channel Telegram"
-          className="flex h-12 w-12 items-center justify-center rounded-2xl text-sky-500 transition hover:bg-sky-50"
+          className="flex h-12 w-12 items-center justify-center rounded-2xl text-sky-500 transition hover:bg-sky-50 dark:hover:bg-sky-500/10"
         >
           <TelegramIcon size={19} />
         </a>
       </aside>
 
       <nav
-        className="fixed inset-x-0 bottom-0 z-50 flex items-center justify-around border-t border-slate-200 bg-white/95 px-1 pt-2 backdrop-blur md:hidden"
+        className="fixed inset-x-0 bottom-0 z-50 flex items-center justify-around border-t border-slate-200 bg-surface/95 px-1 pt-2 backdrop-blur md:hidden"
         style={{ paddingBottom: "calc(0.5rem + env(safe-area-inset-bottom, 0px))" }}
       >
         {NAV_ITEMS.map((item) => {
@@ -99,7 +102,7 @@ export default function Nav() {
               key={item.href}
               onClick={() => goTo(item.href)}
               className={`flex flex-col items-center gap-0.5 rounded-2xl px-2.5 py-1.5 text-[10px] font-medium transition ${
-                active ? "bg-slate-900 text-white" : "text-slate-400"
+                active ? "bg-slate-900 text-on-strong" : "text-slate-400"
               }`}
             >
               <Icon size={17} strokeWidth={2} />
@@ -108,6 +111,8 @@ export default function Nav() {
           );
         })}
       </nav>
+
+      <ThemeToggle variant="floating" />
     </Fragment>
   );
 }

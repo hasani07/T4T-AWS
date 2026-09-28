@@ -73,7 +73,7 @@ export default async function FirmwareAdminPage() {
           Upload firmware baru untuk device rainfall. ESP mengecek versi ini tiap 2 menit dan
           otomatis mengunduh + flash sendiri kalau ada versi lebih baru dari yang terpasang.
         </p>
-        <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+        <p className="mt-2 rounded-lg border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-200">
           Halaman ini tidak ditautkan dari menu navigasi, tapi TIDAK punya login sungguhan -
           hanya kata sandi tunggal yang dicek di server. Jangan sebarkan link-nya, dan anggap
           ini pengaman "jangan sampai ke-upload tidak sengaja", bukan keamanan penuh.
@@ -81,12 +81,12 @@ export default async function FirmwareAdminPage() {
       </header>
 
       <div className="space-y-6">
-        <div className="rounded-2xl border border-slate-200 bg-white p-5">
+        <div className="rounded-2xl border border-slate-200 bg-surface p-5">
           <h2 className="mb-3 text-sm font-semibold text-slate-900">Upload Firmware Baru</h2>
           <FirmwareUploadForm />
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-5">
+        <div className="rounded-2xl border border-slate-200 bg-surface p-5">
           <h2 className="mb-3 text-sm font-semibold text-slate-900">Riwayat Firmware</h2>
           {firmwareHistory.length === 0 ? (
             <p className="text-sm text-slate-500">Belum ada firmware yang diupload.</p>
@@ -118,7 +118,7 @@ export default async function FirmwareAdminPage() {
           )}
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-5">
+        <div className="rounded-2xl border border-slate-200 bg-surface p-5">
           <h2 className="mb-3 text-sm font-semibold text-slate-900">
             Log Terakhir Semua Device (maks 5 baris/device di database, ditampilkan 20 gabungan)
           </h2>

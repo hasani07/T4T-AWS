@@ -59,7 +59,7 @@ export default function SensorCard({
   const vpdClass = vpd !== null ? classifyVPD(vpd) : null;
 
   return (
-    <div className="rounded-3xl bg-white p-5 shadow-[0_2px_24px_rgba(15,23,42,0.06)]">
+    <div className="rounded-3xl bg-surface p-5 shadow-[0_2px_24px_rgba(15,23,42,0.06)]">
       <div className="flex items-start justify-between">
         <h2 className="text-base font-semibold text-slate-900">{device.type}</h2>
         <StatusBadge online={online} />

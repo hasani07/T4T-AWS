@@ -55,13 +55,13 @@ export default function BackupList({ rows }: { rows: BackupRow[] }) {
 
   return (
     <div className="space-y-3">
-      {error && <p className="text-sm text-rose-600">{error}</p>}
+      {error && <p className="text-sm text-rose-600 dark:text-rose-400">{error}</p>}
       {rows.map((row) => {
         const left = daysLeft(row.retention_expires_at);
         const isUrgent = !row.downloaded && !row.expired && left <= 1;
 
         return (
-          <div key={row.id} className="rounded-2xl border border-slate-200 bg-white p-4">
+          <div key={row.id} className="rounded-2xl border border-slate-200 bg-surface p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <span className="text-sm font-semibold text-slate-900">
@@ -88,15 +88,17 @@ export default function BackupList({ rows }: { rows: BackupRow[] }) {
                   Sudah Kadaluarsa
                 </span>
               ) : row.downloaded ? (
-                <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
+                <span className="rounded-full bg-emerald-50 dark:bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-300">
                   Sudah Didownload
                 </span>
               ) : (
                 <button
                   onClick={() => handleDownload(row.id)}
                   disabled={downloadingId === row.id}
-                  className={`rounded-lg px-3 py-2 text-xs font-medium text-white transition disabled:cursor-not-allowed disabled:opacity-50 ${
-                    isUrgent ? "bg-rose-600 hover:bg-rose-500" : "bg-slate-900 hover:bg-slate-800"
+                  className={`rounded-lg px-3 py-2 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                    isUrgent
+                      ? "bg-rose-600 text-white hover:bg-rose-500"
+                      : "bg-slate-900 text-on-strong hover:bg-slate-800"
                   }`}
                 >
                   {downloadingId === row.id

@@ -34,9 +34,9 @@ type ItemState =
   | { status: "error"; message: string; missingFunction: boolean };
 
 const TONE_TEXT: Record<UptimeTone, string> = {
-  good: "text-emerald-700",
-  warn: "text-amber-700",
-  bad: "text-rose-700",
+  good: "text-emerald-700 dark:text-emerald-300",
+  warn: "text-amber-700 dark:text-amber-300",
+  bad: "text-rose-700 dark:text-rose-300",
   none: "text-slate-400",
 };
 const TONE_BAR: Record<UptimeTone, string> = {
@@ -103,7 +103,7 @@ function UptimeItem({ item, state, period }: { item: Item; state: ItemState | un
       {!state && <p className="mt-3 text-xs text-slate-400">Memuat...</p>}
 
       {state?.status === "error" && (
-        <p className="mt-3 rounded-xl bg-rose-50 p-2.5 text-xs text-rose-700">
+        <p className="mt-3 rounded-xl bg-rose-50 dark:bg-rose-500/10 p-2.5 text-xs text-rose-700 dark:text-rose-300">
           {state.missingFunction
             ? "Fungsi database belum dibuat. Jalankan supabase/sql/012_device_uptime.sql di Supabase SQL Editor."
             : `Gagal memuat uptime: ${state.message}`}
@@ -163,7 +163,7 @@ function UptimeItem({ item, state, period }: { item: Item; state: ItemState | un
                     <span>
                       {formatWallClock(o.start)} –{" "}
                       {o.ongoing ? (
-                        <b className="text-rose-600">sedang berlangsung</b>
+                        <b className="text-rose-600 dark:text-rose-400">sedang berlangsung</b>
                       ) : (
                         formatWallClock(o.end)
                       )}
@@ -250,7 +250,7 @@ export default function DeviceUptimePanel({ devices }: { devices: Device[] }) {
   if (devices.length === 0) return null;
 
   return (
-    <div className="mb-6 rounded-3xl bg-white p-5 shadow-[0_2px_24px_rgba(15,23,42,0.06)]">
+    <div className="mb-6 rounded-3xl bg-surface p-5 shadow-[0_2px_24px_rgba(15,23,42,0.06)]">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-sm font-semibold text-slate-900">Uptime Perangkat</h2>
         <div className="inline-flex rounded-full bg-slate-100 p-0.5" role="group" aria-label="Periode uptime">
@@ -261,7 +261,7 @@ export default function DeviceUptimePanel({ devices }: { devices: Device[] }) {
               onClick={() => setPeriod(p.value)}
               aria-pressed={period === p.value}
               className={`rounded-full px-3 py-1 text-xs font-medium transition ${
-                period === p.value ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
+                period === p.value ? "bg-surface text-slate-900 shadow-sm dark:bg-slate-200" : "text-slate-500"
               }`}
             >
               {p.label}

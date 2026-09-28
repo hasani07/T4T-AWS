@@ -9,9 +9,9 @@ interface HistoryRow {
 function RiskBadgeFromLevel({ level }: { level?: string }) {
   if (!level) return null;
   const styles: Record<string, string> = {
-    aman: "bg-emerald-50 text-emerald-700",
-    waspada: "bg-amber-50 text-amber-700",
-    kritis: "bg-rose-50 text-rose-700",
+    aman: "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+    waspada: "bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300",
+    kritis: "bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300",
   };
   return (
     <span
@@ -32,7 +32,7 @@ export default function RecommendationHistory({ rows }: { rows: HistoryRow[] }) 
   return (
     <div className="space-y-3">
       {rows.map((row) => (
-        <div key={row.id} className="rounded-2xl border border-slate-200 bg-white p-4">
+        <div key={row.id} className="rounded-2xl border border-slate-200 bg-surface p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-sm font-semibold text-slate-900">{row.device_type}</h3>
             <span className="text-xs text-slate-400">

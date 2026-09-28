@@ -31,8 +31,8 @@ export default function PeriodSelector({
           onClick={() => onPresetChange(opt.value)}
           className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
             preset === opt.value
-              ? "bg-slate-900 text-white"
-              : "border border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
+              ? "bg-slate-900 text-on-strong"
+              : "border border-slate-300 bg-surface text-slate-600 hover:bg-slate-50"
           }`}
         >
           {opt.label}
