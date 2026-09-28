@@ -42,7 +42,7 @@ returns table (
   outage_count           integer,            -- jumlah gangguan
   longest_outage_seconds double precision,   -- gangguan terpanjang (detik)
   last_reading           timestamp,          -- pembacaan terakhir yang diketahui
-  recent_outages         jsonb               -- sampai 5 gangguan terbaru: [{start,end,seconds}]
+  recent_outages         jsonb               -- sampai 20 gangguan terbaru: [{start,end,seconds}]
 )
 language sql
 stable
@@ -128,7 +128,7 @@ as $$
       (select jsonb_agg(
                 jsonb_build_object('start', c.o_start, 'end', c.o_end, 'seconds', c.secs)
                 order by c.o_start desc)
-       from (select * from clipped order by o_start desc limit 5) c),
+       from (select * from clipped order by o_start desc limit 20) c),
       '[]'::jsonb)
   from bounds b;
 $$;
