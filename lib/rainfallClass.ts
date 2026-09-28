@@ -36,12 +36,12 @@ export interface RainCategory {
 
 const CATEGORIES: Record<RainCategoryKey, RainCategory> = {
   none: { key: "none", label: "Tidak Hujan", badgeClass: "bg-slate-100 text-slate-600" },
-  very_light: { key: "very_light", label: "Hujan Sangat Ringan", badgeClass: "bg-cyan-50 text-cyan-700" },
-  light: { key: "light", label: "Hujan Ringan", badgeClass: "bg-sky-100 text-sky-800" },
-  moderate: { key: "moderate", label: "Hujan Sedang", badgeClass: "bg-amber-100 text-amber-800" },
-  heavy: { key: "heavy", label: "Hujan Lebat", badgeClass: "bg-orange-100 text-orange-800" },
-  very_heavy: { key: "very_heavy", label: "Hujan Sangat Lebat", badgeClass: "bg-red-100 text-red-800" },
-  extreme: { key: "extreme", label: "Hujan Ekstrem", badgeClass: "bg-fuchsia-100 text-fuchsia-800" },
+  very_light: { key: "very_light", label: "Hujan Sangat Ringan", badgeClass: "bg-cyan-50 dark:bg-cyan-500/10 text-cyan-700 dark:text-cyan-300" },
+  light: { key: "light", label: "Hujan Ringan", badgeClass: "bg-sky-100 dark:bg-sky-500/15 text-sky-800 dark:text-sky-200" },
+  moderate: { key: "moderate", label: "Hujan Sedang", badgeClass: "bg-amber-100 dark:bg-amber-500/15 text-amber-800 dark:text-amber-200" },
+  heavy: { key: "heavy", label: "Hujan Lebat", badgeClass: "bg-orange-100 dark:bg-orange-500/15 text-orange-800 dark:text-orange-200" },
+  very_heavy: { key: "very_heavy", label: "Hujan Sangat Lebat", badgeClass: "bg-red-100 dark:bg-red-500/15 text-red-800 dark:text-red-200" },
+  extreme: { key: "extreme", label: "Hujan Ekstrem", badgeClass: "bg-fuchsia-100 dark:bg-fuchsia-500/15 text-fuchsia-800 dark:text-fuchsia-200" },
 };
 
 export function getRainCategory(key: RainCategoryKey): RainCategory {
