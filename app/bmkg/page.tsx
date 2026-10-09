@@ -2,6 +2,7 @@ import { supabase } from "@/lib/supabase";
 import { getSetting } from "@/lib/settings";
 import { fetchBmkgForecast, findNearestEntry } from "@/lib/bmkg";
 import { parseBmkgUtc } from "@/lib/bmkgTime";
+import { fetchDeviceRainfalls } from "@/lib/rainfall";
 import PageShell from "@/components/PageShell";
 import AutoRefresher from "@/components/AutoRefresher";
 import BmkgCompareCard from "@/components/bmkg/BmkgCompareCard";
@@ -56,6 +57,22 @@ async function getReleaseSeen(
 export default async function BmkgPage() {
   const devices = await getDevices();
 
+  // Device weather station & sensor hujan berbagi id yang sama (1 =
+  // Cisangkuy, 2 = Ciminyak -- lihat catatan di lib/rainfall.ts), jadi
+  // acc_today dari situ dipakai langsung untuk "kondisi hujan" di kartu ini.
+  // Diambil sekali di sini (bukan tiap device satu-satu) supaya hemat query;
+  // kalau gagal (mis. view belum ada), jangan sampai menjatuhkan halaman --
+  // tampilkan kartu tanpa info hujan saja.
+  let rainByDevice = new Map<number, number | null>();
+  try {
+    const rainfalls = await fetchDeviceRainfalls(devices.map((d) => d.id));
+    rainByDevice = new Map(
+      rainfalls.map((r) => [r.deviceId, r.summary?.acc_today ?? null])
+    );
+  } catch (err) {
+    console.error("Gagal mengambil ringkasan curah hujan untuk halaman BMKG:", err);
+  }
+
   const cards = await Promise.all(
     devices.map(async (device) => {
       const adm4 = await getSetting<string>(`bmkg_adm4_${device.id}`, "");
@@ -63,7 +80,8 @@ export default async function BmkgPage() {
       const forecast = adm4 ? await fetchBmkgForecast(adm4) : null;
       const nearest = forecast ? findNearestEntry(forecast.entries) : null;
       const release = nearest ? await getReleaseSeen(device.id, nearest.analysisDate) : null;
-      return { device, adm4, latest, forecast, nearest, release };
+      const todayRainMm = rainByDevice.get(device.id) ?? null;
+      return { device, adm4, latest, forecast, nearest, release, todayRainMm };
     })
   );
 
@@ -99,7 +117,7 @@ export default async function BmkgPage() {
       </header>
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-        {cards.map(({ device, adm4, latest, forecast, nearest, release }) => (
+        {cards.map(({ device, adm4, latest, forecast, nearest, release, todayRainMm }) => (
           <BmkgCompareCard
             key={device.id}
             device={device}
@@ -109,6 +127,7 @@ export default async function BmkgPage() {
             nearest={nearest}
             release={release}
             hasForecastError={!!adm4 && !forecast}
+            todayRainMm={todayRainMm}
           />
         ))}
       </div>
