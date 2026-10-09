@@ -12,7 +12,6 @@ const DEVICE_OPTIONS = [
 // VERBOSE_LOG_INTERVAL_MS (ESP kirim baris tiap 3 dtk kalau izin sedang aktif).
 // Nilai run_until di database SELALU 10 menit ke depan saat Run diklik.
 const RUN_DURATION_MS = 10 * 60 * 1000;
-const POLL_MS = 3000;
 const CONSOLE_KEEP = 50;
 
 type ConsoleRow = { id: number; message: string; created_at: string };
@@ -22,9 +21,11 @@ export default function RainfallConsole() {
   const [running, setRunning] = useState(false);
   const [rows, setRows] = useState<ConsoleRow[]>([]);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const boxRef = useRef<HTMLDivElement>(null);
 
+  // Ambil isi yang SUDAH ADA di database sekali saat mulai memantau (baris lama
+  // sebelum subscribe dipasang). Setelah ini, baris BARU datang lewat Realtime
+  // di bawah -- bukan lewat fetch berulang lagi.
   async function fetchLatest(forDeviceId: number) {
     const { data, error } = await supabase
       .from("device_console")
@@ -45,14 +46,40 @@ export default function RainfallConsole() {
     });
   }
 
+  // Dulu: polling (fetchLatest diulang tiap 3 detik). Sekarang: baris lama
+  // diambil SEKALI, lalu baris baru masuk langsung lewat Supabase Realtime
+  // (websocket) begitu ESP menulis ke device_console -- tidak nunggu interval
+  // polling lagi. CATATAN: tabel device_console harus diaktifkan untuk
+  // Realtime di dashboard Supabase (Database -> Replication), kalau belum
+  // dicentang baris baru tidak akan muncul walau kode ini sudah benar.
   useEffect(() => {
     if (!running) return;
+
     fetchLatest(deviceId).then(scrollToBottom);
-    timerRef.current = setInterval(() => {
-      fetchLatest(deviceId).then(scrollToBottom);
-    }, POLL_MS);
+
+    const channel = supabase
+      .channel(`device_console_${deviceId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "device_console",
+          filter: `device_id=eq.${deviceId}`,
+        },
+        (payload: { new: ConsoleRow }) => {
+          setRows((prev) => {
+            const next = [...prev, payload.new];
+            // Jaga maksimal CONSOLE_KEEP baris di tampilan, sama seperti dulu.
+            return next.length > CONSOLE_KEEP ? next.slice(next.length - CONSOLE_KEEP) : next;
+          });
+          scrollToBottom();
+        }
+      )
+      .subscribe();
+
     return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
+      supabase.removeChannel(channel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [running, deviceId]);
@@ -76,7 +103,6 @@ export default function RainfallConsole() {
 
   async function handleStop() {
     setRunning(false);
-    if (timerRef.current) clearInterval(timerRef.current);
     const { error } = await supabase
       .from("device_debug")
       .upsert({ device_id: deviceId, run_until: null }, { onConflict: "device_id" });
@@ -90,7 +116,8 @@ export default function RainfallConsole() {
   function handleDeviceChange(id: number) {
     setDeviceId(id);
     setRows([]);
-    if (running) fetchLatest(id).then(scrollToBottom);
+    // useEffect di atas akan otomatis lepas subscribe device lama & pasang yang
+    // baru (karena deviceId ikut jadi dependency), termasuk fetch ulang baris lama.
   }
 
   return (
@@ -122,7 +149,7 @@ export default function RainfallConsole() {
         )}
 
         {running && (
-          <span className="inline-flex items-center gap-1.5 text-xs text-emerald-700 dark:text-emerald-300">
+          <span className="inline-flex items-center gap-1.5 text-xs text-emerald-700">
             <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
             memantau...
           </span>
@@ -133,7 +160,7 @@ export default function RainfallConsole() {
 
       <div
         ref={boxRef}
-        className="h-96 overflow-y-auto rounded-xl bg-[#020617] p-4 font-mono text-xs text-emerald-400"
+        className="h-96 overflow-y-auto rounded-xl bg-slate-950 p-4 font-mono text-xs text-emerald-400"
       >
         {rows.length === 0 ? (
           <p className="text-slate-500">
