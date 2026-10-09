@@ -3,6 +3,9 @@ import { SensorReading } from "./types";
 import { DateRange } from "./dateRange";
 import { toSensorQueryBoundary } from "./sensorTimeOffset";
 import { RainfallRow } from "./rainfall";
+// calcVPD murni matematika (sama rumus yang dipakai di SensorCard/BmkgCompareCard),
+// dipakai supaya CSV mentah ini juga punya kolom VPD per baris.
+import { calcVPD } from "./rules/ruleEngine";
 
 const PAGE_SIZE = 1000; // batas default Supabase per query
 
@@ -73,12 +76,16 @@ export function buildCsv(
     "humidity",
     "wind_speed",
     "wind_direction",
+    "vpd_kpa",
   ];
 
   const lines = [header.join(",")];
 
   for (const r of readings) {
     const deviceType = deviceTypeById[r.device_id] ?? "";
+    // Dihitung per baris dari temperature & humidity baris itu sendiri --
+    // rumus sama persis dengan VPD yang tampil di kartu SensorCard/BmkgCompareCard.
+    const vpd = calcVPD(r.temperature, r.humidity);
     lines.push(
       [
         r.created_at,
@@ -88,6 +95,7 @@ export function buildCsv(
         r.humidity,
         r.wind_speed,
         csvEscape(r.wind_direction),
+        vpd,
       ].join(",")
     );
   }
