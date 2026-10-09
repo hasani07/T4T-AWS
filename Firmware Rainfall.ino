@@ -31,6 +31,13 @@
  * USB sekali (OTA tidak bisa memperbaiki dirinya sendiri kalau OTA-nya
  * hilang) - lihat FW_VERSION di bawah untuk alasan nomornya dinaikkan.
  *
+ * SERIAL MONITOR WEB (device_console): sekarang menampung SEMUA kejadian
+ * penting (WiFi connect/putus, RSSI, upload OK/GAGAL, sensor zero-streak,
+ * memori rendah, dsb) lewat antrian kecil (lihat vlog()/logQueue di bawah),
+ * bukan cuma baris pembacaan sampel seperti sebelumnya. Tetap pakai tabel
+ * device_console & RPC trim_device_console yang SAMA, tidak ada perubahan
+ * di Supabase.
+ *
  * Library: "DFRobot_RainfallSensor" (https://github.com/DFRobot/DFRobot_RainfallSensor)
  * Board  : ESP32C3 Dev Module
  * Sensor : DIP switch di posisi I2C
@@ -46,6 +53,7 @@
 #include <esp_system.h>
 #include <esp_task_wdt.h>
 #include <Update.h>
+#include <stdarg.h>
 #include "DFRobot_RainfallSensor.h"
 
 // =====================================================
@@ -219,6 +227,16 @@ long verboseUntilEpoch = 0;
 // Monitor fisik). Dipush ke device_console oleh loop() saat verbose aktif,
 // pada jadwalnya SENDIRI (bukan tiap sampel) - lihat VERBOSE_LOG_INTERVAL_MS.
 char lastSampleLine[180] = "";
+// Antrian baris log untuk Serial Monitor WEB (device_console). Dulu hanya
+// lastSampleLine (baris sampel) yang dikirim; sekarang SEMUA kejadian
+// penting (WiFi, upload, sensor, memori) juga masuk sini lewat vlog(),
+// supaya yang terlihat di web sama lengkapnya dengan Serial Monitor fisik.
+// Ring buffer sederhana: kalau penuh, baris TERLAMA dibuang duluan (baris
+// terbaru lebih berguna daripada baris lama yang sudah basi).
+#define LOG_QUEUE_SIZE 12
+char    logQueue[LOG_QUEUE_SIZE][180];
+uint8_t logQueueHead  = 0;   // index baris TERLAMA (yang akan dikirim berikutnya)
+uint8_t logQueueCount = 0;   // berapa baris sedang mengantri
 // Versi yang BENAR-BENAR tertanam di flash saat ini, tersimpan di NVS (bukan cuma
 // angka FW_VERSION yang di-compile). Pengaman: kalau suatu saat lupa menaikkan
 // FW_VERSION sebelum upload firmware baru, ESP tetap mencatat sendiri "saya sudah
@@ -234,6 +252,7 @@ void pushLog(const char* message);   // didefinisikan di bawah
 void checkOta();                     // didefinisikan di bawah
 void pollDebugFlag();                // didefinisikan di bawah
 void pushConsoleLine();              // didefinisikan di bawah
+void vlog(const char* fmt, ...);     // didefinisikan di bawah
 
 // ---------- Watchdog: reset otomatis kalau program macet ----------
 void setupWatchdog() {
@@ -251,6 +270,34 @@ void setupWatchdog() {
   esp_task_wdt_add(NULL);      // daftarkan task loop()
 }
 
+// ---------- Log jarak jauh (antrian untuk Serial Monitor WEB) ----------
+// Masukkan satu baris ke logQueue. Kalau sudah penuh, baris TERLAMA dibuang
+// (digeser) supaya baris baru selalu punya tempat.
+void enqueueLog(const char* line) {
+  if (logQueueCount >= LOG_QUEUE_SIZE) {
+    logQueueHead = (logQueueHead + 1) % LOG_QUEUE_SIZE;
+    logQueueCount--;
+  }
+  uint8_t idx = (logQueueHead + logQueueCount) % LOG_QUEUE_SIZE;
+  strncpy(logQueue[idx], line, sizeof(logQueue[idx]) - 1);
+  logQueue[idx][sizeof(logQueue[idx]) - 1] = '\0';
+  logQueueCount++;
+}
+
+// Serial.printf + masuk ke antrian device_console sekaligus, dalam SATU
+// panggilan. Dipakai di semua titik yang dulu cuma Serial.print/println/printf
+// biasa, supaya kejadian itu juga terlihat di Serial Monitor WEB (bukan cuma
+// di kabel USB) -- tanpa mengubah apa pun di sisi Supabase.
+void vlog(const char* fmt, ...) {
+  char buf[180];
+  va_list args;
+  va_start(args, fmt);
+  vsnprintf(buf, sizeof(buf), fmt, args);
+  va_end(args);
+  Serial.println(buf);
+  enqueueLog(buf);
+}
+
 // ---------- WiFi: dicoba terus sampai tersambung ----------
 void applyTxPower() {
   WiFi.setTxPower(usingLowTxPower ? WIFI_TX_POWER_LOW : WIFI_TX_POWER_HIGH);
@@ -263,7 +310,7 @@ void fallbackToLowTxPower() {
   if (usingLowTxPower) return;   // sudah di daya rendah, tidak ada yang perlu dilakukan
   usingLowTxPower = true;
   prefs.putBool("txLow", true);
-  Serial.println("!!! Tidak berhasil connect WiFi di daya TINGGI -> turun ke daya RENDAH (tersimpan, dipakai mulai sekarang).");
+  vlog("!!! Tidak berhasil connect WiFi di daya TINGGI -> turun ke daya RENDAH (tersimpan, dipakai mulai sekarang).");
   applyTxPower();
 }
 
@@ -308,8 +355,8 @@ void maintainWiFi() {
   if (WiFi.status() == WL_CONNECTED) {
     if (wifiDown) {
       wifiDown = false;
-      Serial.printf("\nWiFi tersambung, IP: %s, RSSI: %d dBm\n",
-                    WiFi.localIP().toString().c_str(), WiFi.RSSI());
+      vlog("\nWiFi tersambung, IP: %s, RSSI: %d dBm",
+           WiFi.localIP().toString().c_str(), WiFi.RSSI());
     }
     if (!timeConfigured) {   // mulai sinkron waktu NTP setelah internet ada
       configTime(GMT_OFFSET_SEC, DST_OFFSET_SEC, "pool.ntp.org", "time.google.com");
@@ -323,13 +370,13 @@ void maintainWiFi() {
   if (!wifiDown) {           // baru putus, atau memang belum pernah tersambung
     wifiDown = true;
     wifiDownSince = now;
-    Serial.println("\nWiFi tidak tersambung, mencoba terus...");
+    vlog("\nWiFi tidak tersambung, mencoba terus...");
   }
 
   // Coba sambung ulang tiap WIFI_RETRY_MS
   if (now - lastWifiAttemptMs >= WIFI_RETRY_MS) {
     // status: 1 = SSID tidak ditemukan, 4 = gagal connect (biasanya password/keamanan), 6 = terputus
-    Serial.printf("Coba sambung WiFi lagi... (status=%d)\n", (int)WiFi.status());
+    vlog("Coba sambung WiFi lagi... (status=%d)", (int)WiFi.status());
     WiFi.disconnect();
     WiFi.begin(WIFI_SSID, WIFI_PASS);
     applyTxPower();
@@ -373,8 +420,8 @@ void waitForWiFi() {
     }
   }
   maintainWiFi();   // cetak IP + mulai NTP
-  Serial.printf("Kekuatan sinyal (RSSI): %d dBm (daya pancar: %s)\n",
-                WiFi.RSSI(), usingLowTxPower ? "RENDAH" : "TINGGI");
+  vlog("Kekuatan sinyal (RSSI): %d dBm (daya pancar: %s)",
+       WiFi.RSSI(), usingLowTxPower ? "RENDAH" : "TINGGI");
 }
 
 // Kode "hari" (YYYYMMDD) yang berganti tepat di jam reset (RESET_HOUR:RESET_MINUTE).
@@ -498,8 +545,8 @@ void takeSample() {
     dailyRain   += deltaMm;
     pendingRain += deltaMm;
     if (deltaTips > 0) {
-      Serial.printf(">>> HUJAN TERDETEKSI: +%lu guling = +%.4f mm\n",
-                    (unsigned long)deltaTips, deltaMm);
+      vlog(">>> HUJAN TERDETEKSI: +%lu guling = +%.4f mm",
+           (unsigned long)deltaTips, deltaMm);
     }
   }
   lastTips = effectiveTips;
@@ -517,12 +564,13 @@ void takeSample() {
            timeStr(), sampleCount, SAMPLES_PER_MINUTE,
            (unsigned long)tips, effectiveTips * MM_PER_TIP, pendingRain, dailyRain);
   Serial.println(lastSampleLine);
+  enqueueLog(lastSampleLine);   // baris sampel juga ikut ke Serial Monitor WEB
 
   // Nol mendadak yang berulang = sensor tidak menjawab atau memang restart.
   if (ignoredZero) {
     zeroStreak++;
-    Serial.printf("!!! Pembacaan 0 diabaikan (%u kali berturut-turut) - kabel I2C longgar atau sensor restart?\n",
-                  (unsigned)zeroStreak);
+    vlog("!!! Pembacaan 0 diabaikan (%u kali berturut-turut) - kabel I2C longgar atau sensor restart?",
+         (unsigned)zeroStreak);
   } else {
     zeroStreak = 0;
   }
@@ -532,10 +580,10 @@ void takeSample() {
     zeroStreak = 0;
     i2cScan();
     if (!Sensor.begin()) {
-      Serial.println("Sensor TIDAK merespons -> dianggap gagal I2C, mencoba lagi otomatis.");
+      vlog("Sensor TIDAK merespons -> dianggap gagal I2C, mencoba lagi otomatis.");
       sensorReady = false;
     } else if (Sensor.getRawData() == 0) {
-      Serial.println("Sensor melaporkan 0 terus -> dianggap sensor restart, baseline di-nol-kan.");
+      vlog("Sensor melaporkan 0 terus -> dianggap sensor restart, baseline di-nol-kan.");
       lastTips = 0;
     }
   }
@@ -581,8 +629,8 @@ bool uploadToSupabase(float rainMm, float dailyMm) {
            DEVICE_ID, rainMm, dailyMm);
 
   int code = http.POST((uint8_t*)payload, strlen(payload));
-  Serial.printf("Upload -> HTTP %d | RSSI %d dBm | %s\n", code, WiFi.RSSI(), payload);
-  if (code < 0) Serial.println(http.errorToString(code));
+  vlog("Upload -> HTTP %d | RSSI %d dBm | %s", code, WiFi.RSSI(), payload);
+  if (code < 0) vlog("%s", http.errorToString(code).c_str());
 
   http.end();
   return (code >= 200 && code < 300);
@@ -593,7 +641,7 @@ void sendMinuteData() {
   bool ok = uploadToSupabase(pendingRain, dailyRain);
 
   if (ok) {
-    Serial.println("Upload sukses");
+    vlog("Upload sukses");
     pendingRain = 0;
     uploadFailStreak = 0;
     char m[96];
@@ -601,7 +649,7 @@ void sendMinuteData() {
     pushLog(m);
   } else {
     // Hujan TIDAK hilang: tetap di pendingRain dan ikut terkirim di pengiriman berikutnya
-    Serial.printf("Upload GAGAL, %.4f mm ditunda ke pengiriman berikutnya\n", pendingRain);
+    vlog("Upload GAGAL, %.4f mm ditunda ke pengiriman berikutnya", pendingRain);
     {
       char m[96];
       snprintf(m, sizeof(m), "Upload GAGAL (%ux) | pending %.4f mm tertunda", (unsigned)(uploadFailStreak + 1), pendingRain);
@@ -613,12 +661,12 @@ void sendMinuteData() {
     if (WiFi.status() == WL_CONNECTED) {
       uploadFailStreak++;
       if (uploadFailStreak == UPLOAD_FAIL_RECONNECT) {
-        Serial.println("Upload gagal 5x berturut-turut -> sambung ulang WiFi");
+        vlog("Upload gagal 5x berturut-turut -> sambung ulang WiFi");
         WiFi.disconnect();
         WiFi.begin(WIFI_SSID, WIFI_PASS);
         applyTxPower();
       } else if (uploadFailStreak >= UPLOAD_FAIL_RESTART) {
-        Serial.println("Upload gagal 10x berturut-turut -> restart ESP");
+        vlog("Upload gagal 10x berturut-turut -> restart ESP");
         pushLog("Restart: upload gagal 10x berturut-turut");   // WiFi masih tersambung, jadi ini masih bisa terkirim
         saveState();
         delay(200);
@@ -635,10 +683,10 @@ void sendMinuteData() {
   // 3 menit berturut-turut sebelum restart supaya lonjakan sesaat tidak memicu restart.
   uint32_t freeHeap = ESP.getFreeHeap();
   uint32_t maxBlock = ESP.getMaxAllocHeap();
-  Serial.printf("Memori bebas: %u byte (blok terbesar %u)\n", (unsigned)freeHeap, (unsigned)maxBlock);
+  vlog("Memori bebas: %u byte (blok terbesar %u)", (unsigned)freeHeap, (unsigned)maxBlock);
   if (freeHeap < MIN_FREE_HEAP || maxBlock < MIN_MAX_ALLOC) {
     if (++lowHeapStreak >= 3) {
-      Serial.println("Memori menipis/terfragmentasi, restart...");
+      vlog("Memori menipis/terfragmentasi, restart...");
       pushLog("Restart: memori menipis/terfragmentasi");
       saveState();
       delay(200);
@@ -873,12 +921,18 @@ void pollDebugFlag() {
   verboseUntilEpoch = (body.indexOf("run_until_epoch") < 0) ? 0 : jsonFindInt(body, "run_until_epoch", 0);
 }
 
-// Kirim satu baris (lastSampleLine) ke device_console. Dipanggil dari loop()
-// HANYA selama verbose aktif, pada jadwal VERBOSE_LOG_INTERVAL_MS sendiri
-// (terpisah dari kecepatan sampling sensor yang 2 detik).
+// Kirim SATU baris TERLAMA dari logQueue ke device_console. Dipanggil dari
+// loop() HANYA selama verbose aktif, pada jadwal VERBOSE_LOG_INTERVAL_MS
+// sendiri (terpisah dari kecepatan sampling sensor). Dulu hanya mengirim
+// lastSampleLine (baris sampel terakhir); sekarang mengirim ISI ANTRIAN
+// (logQueue) yang berisi SEMUA kejadian penting -- WiFi, upload, sensor,
+// memori -- bukan cuma baris sampel, lewat vlog() di titik-titik itu.
+// Kalau kirim GAGAL, baris itu TIDAK dibuang dari antrian -- dicoba lagi di
+// panggilan berikutnya, supaya baris log tidak hilang gara-gara satu kali
+// internet tersendat.
 void pushConsoleLine() {
   if (WiFi.status() != WL_CONNECTED) return;
-  if (lastSampleLine[0] == '\0') return;   // belum ada sampel sama sekali
+  if (logQueueCount == 0) return;   // antrian kosong, tidak ada yang perlu dikirim
 
   WiFiClientSecure client;
   client.setInsecure();
@@ -894,10 +948,14 @@ void pushConsoleLine() {
   http.addHeader("Prefer", "return=minimal");
 
   char payload[220];
-  snprintf(payload, sizeof(payload), "{\"device_id\":%d,\"message\":\"%s\"}", DEVICE_ID, lastSampleLine);
+  snprintf(payload, sizeof(payload), "{\"device_id\":%d,\"message\":\"%s\"}", DEVICE_ID, logQueue[logQueueHead]);
   int code = http.POST((uint8_t*)payload, strlen(payload));
   http.end();
-  if (code != 200 && code != 201) return;   // gagal sesekali tidak apa-apa, bukan kejadian kritis
+  if (code != 200 && code != 201) return;   // gagal -> baris TETAP di antrian, dicoba lagi berikutnya
+
+  // Baru boleh dianggap terkirim & dibuang dari antrian kalau HTTP benar-benar sukses.
+  logQueueHead = (logQueueHead + 1) % LOG_QUEUE_SIZE;
+  logQueueCount--;
 
   // Buang baris lama HANYA tiap CONSOLE_TRIM_EVERY kali (bukan tiap kirim) - menghemat
   // separuh request selama verbose aktif. Sedikit "kelebihan" sementara di database
