@@ -11,7 +11,7 @@ import DeviceMap, { DeviceMapMarker } from "@/components/DeviceMap";
 import TelegramJoinCard from "@/components/TelegramJoinCard";
 import LiveClock from "@/components/LiveClock";
 import { isDeviceOnline } from "@/lib/deviceStatus";
-import { DEVICE_COORDINATES } from "@/lib/config";
+import { DEVICE_COORDINATES, RAINFALL_OFFLINE_THRESHOLD_MINUTES } from "@/lib/config";
 import { Thermometer, CloudRain, Droplets, Wind } from "lucide-react";
 
 // Selalu ambil data terbaru saat halaman diakses, jangan pakai cache statis
@@ -137,15 +137,37 @@ export default async function DashboardPage() {
     .filter((r): r is NonNullable<typeof r> => r !== null);
   const totalRainfall24h = rainSummaries.reduce((sum, r) => sum + r.acc_24h, 0);
 
+  // Satu titik di peta = satu LOKASI, tapi tiap lokasi punya 2 alat terpisah
+  // (weather station di tabel `sensors`, sensor hujan di `rainfall_readings`)
+  // dengan status online/offline sendiri-sendiri -- jadi disiapkan di sini
+  // supaya popup peta (DeviceMap) bisa menampilkan ringkasan dua-duanya.
   const mapMarkers: DeviceMapMarker[] = devicesWithReadings
     .filter((d) => DEVICE_COORDINATES[d.type])
-    .map((d) => ({
-      id: d.id,
-      label: d.type,
-      lat: DEVICE_COORDINATES[d.type].lat,
-      lon: DEVICE_COORDINATES[d.type].lon,
-      online: d.latest ? isDeviceOnline(d.latest.created_at) : false,
-    }));
+    .map((d) => {
+      const weatherOnline = d.latest ? isDeviceOnline(d.latest.created_at) : false;
+      const rain = rainfalls.find((r) => r.deviceId === d.id) ?? null;
+      const rainOnline = rain
+        ? isDeviceOnline(rain.lastReadingAt, RAINFALL_OFFLINE_THRESHOLD_MINUTES)
+        : false;
+
+      return {
+        id: d.id,
+        label: d.type,
+        lat: DEVICE_COORDINATES[d.type].lat,
+        lon: DEVICE_COORDINATES[d.type].lon,
+        online: weatherOnline || rainOnline,
+        weather: {
+          online: weatherOnline,
+          temperature: d.latest?.temperature ?? null,
+          humidity: d.latest?.humidity ?? null,
+          windSpeed: d.latest?.wind_speed ?? null,
+        },
+        rainfall: {
+          online: rainOnline,
+          todayMm: rain?.summary?.acc_today ?? null,
+        },
+      };
+    });
 
   return (
     <PageShell>
