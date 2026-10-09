@@ -7,6 +7,9 @@ import { WIND_DIRECTION_LABELS } from "@/lib/config";
 import { formatDateTime, sensorTimestampToTrueUtcMs } from "@/lib/deviceStatus";
 import { useLatestReadings } from "@/lib/useLatestReadings";
 import { formatDetection, formatDuration, formatWibFromUtcMs, parseBmkgUtc } from "@/lib/bmkgTime";
+import { calcVPD, classifyVPD } from "@/lib/rules/ruleEngine";
+import { classifyDailyRain } from "@/lib/rainfallClass";
+import RainCategoryBadge from "@/components/RainCategoryBadge";
 import BmkgAdm4Setting from "./BmkgAdm4Setting";
 import BmkgDownload from "./BmkgDownload";
 import { CloudSun, Radio } from "lucide-react";
@@ -16,6 +19,13 @@ function fmt(n: number | null | undefined, digits = 1): string {
   return n === null || n === undefined || Number.isNaN(n) ? "-" : n.toFixed(digits);
 }
 
+// Sama seperti di SensorCard.tsx -- label & warna kelas VPD.
+const VPD_CLASS_LABEL: Record<string, string> = {
+  rendah: "Rendah",
+  sedang: "Sedang",
+  tinggi: "Tinggi",
+};
+
 export default function BmkgCompareCard({
   device,
   initialLatest,
@@ -24,6 +34,7 @@ export default function BmkgCompareCard({
   nearest,
   release,
   hasForecastError,
+  todayRainMm,
 }: {
   device: Device;
   initialLatest: SensorReading | null;
@@ -33,6 +44,10 @@ export default function BmkgCompareCard({
   // Kapan sistem kita pertama kali melihat rilis BMKG ini di API (tabel bmkg_releases).
   release: { firstSeenAt: string; isBaseline: boolean } | null;
   hasForecastError: boolean;
+  // Akumulasi hujan HARI INI (sejak 00:00 WIB) dari sensor hujan ESP terpisah
+  // (device_id yang sama, lihat lib/rainfall.ts) -- null kalau belum ada data
+  // sama sekali hari ini (BUKAN berarti 0mm, lihat classifyDailyRain).
+  todayRainMm: number | null;
 }) {
   // Sisi "Sensor Kami": dijaga segar oleh polling 30 detik + ambil-ulang saat
   // tab kembali aktif (lib/useLatestReadings), BUKAN cuma Realtime. Sebelumnya
@@ -75,6 +90,16 @@ export default function BmkgCompareCard({
   const detectionLabel = release
     ? formatDetection(release.firstSeenAt, releasedMs, release.isBaseline)
     : null;
+
+  // VPD: sama rumus & ambang dengan SensorCard.tsx, dihitung dari pembacaan
+  // terakhir yang sama yang sudah tampil di atas (suhu & kelembaban).
+  const vpd = latest ? calcVPD(latest.temperature, latest.humidity) : null;
+  const vpdClass = vpd !== null ? classifyVPD(vpd) : null;
+
+  // Kondisi hujan HARI INI (sejak 00:00 WIB), dari sensor hujan ESP terpisah
+  // (lihat prop todayRainMm). null = belum ada data sama sekali hari ini,
+  // beda dengan 0mm yang berarti memang belum hujan.
+  const rainCategory = todayRainMm !== null ? classifyDailyRain(todayRainMm) : null;
 
   return (
     <div className="rounded-3xl bg-surface p-5 shadow-[0_2px_24px_rgba(15,23,42,0.06)]">
@@ -127,6 +152,27 @@ export default function BmkgCompareCard({
                   : "-"}
               </b>
             </p>
+            <p className="text-sm text-slate-900">
+              VPD:{" "}
+              <b>
+                {vpd !== null && vpdClass
+                  ? `${vpd.toFixed(2)} kPa (${VPD_CLASS_LABEL[vpdClass]})`
+                  : "-"}
+              </b>
+            </p>
+            <div className="mt-1.5 flex items-center justify-between gap-2">
+              <span className="text-sm text-slate-900">Kondisi Hujan:</span>
+              {rainCategory ? (
+                <RainCategoryBadge category={rainCategory} />
+              ) : (
+                <span className="text-sm font-semibold text-slate-900">-</span>
+              )}
+            </div>
+            {todayRainMm !== null && (
+              <p className="text-[11px] text-slate-500">
+                Akumulasi hari ini: <b className="text-slate-700">{todayRainMm.toFixed(1)} mm</b>
+              </p>
+            )}
             {latest && (
               <p className="mt-2 border-t border-slate-200 pt-2 text-[11px] text-slate-500">
                 Diukur: <b className="text-slate-700">{formatDateTime(latest.created_at)}</b>
