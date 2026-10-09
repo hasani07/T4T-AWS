@@ -73,7 +73,12 @@ export default function SensorCardGrid({
   return (
     <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
       {devices.map((device) => (
-        <SensorCard key={device.id} device={device} />
+        // id ini dituju oleh link "Lihat kartu cuaca" di popup peta Lokasi
+        // Device (components/DeviceMap.tsx) -- scroll-margin-top supaya
+        // kartunya tidak ketutup header saat di-scroll ke sini.
+        <div key={device.id} id={`weather-card-${device.id}`} className="scroll-mt-20">
+          <SensorCard device={device} />
+        </div>
       ))}
     </div>
   );
