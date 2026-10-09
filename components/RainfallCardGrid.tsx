@@ -66,11 +66,15 @@ export default function RainfallCardGrid({
 
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
         {devices.map((device) => (
-          <RainfallCard
-            key={device.id}
-            locationName={device.type}
-            rainfall={rainfalls.find((r) => r.deviceId === device.id)}
-          />
+          // id ini dituju oleh link "Lihat kartu hujan" di popup peta Lokasi
+          // Device (components/DeviceMap.tsx) -- scroll-margin-top supaya
+          // kartunya tidak ketutup header saat di-scroll ke sini.
+          <div key={device.id} id={`rainfall-card-${device.id}`} className="scroll-mt-20">
+            <RainfallCard
+              locationName={device.type}
+              rainfall={rainfalls.find((r) => r.deviceId === device.id)}
+            />
+          </div>
         ))}
       </div>
 
