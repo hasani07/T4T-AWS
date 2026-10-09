@@ -1,7 +1,10 @@
-// Ekspor perbandingan sensor vs BMKG ke CSV. Sengaja tanpa import supaya
-// murni dan mudah diuji. Data mentahnya datang dari fungsi SQL
-// bmkg_compare_export (supabase/sql/009_bmkg_snapshots.sql).
+// Ekspor perbandingan sensor vs BMKG ke CSV. Data mentahnya datang dari
+// fungsi SQL bmkg_compare_export (supabase/sql/009_bmkg_snapshots.sql).
 import { formatWibSortable, parseBmkgUtc } from "./bmkgTime";
+// calcVPD murni matematika (tanpa side effect), sama yang dipakai di
+// SensorCard/BmkgCompareCard, supaya angka VPD di CSV konsisten dengan yang
+// ditampilkan di dashboard.
+import { calcVPD } from "./rules/ruleEngine";
 
 export type BmkgExportRange = "24h" | "7d" | "30d";
 
@@ -90,6 +93,7 @@ export const BMKG_CSV_HEADER = [
   "sensor_wind_ms",
   "sensor_wind_dir",
   "sensor_samples",
+  "sensor_vpd_kpa",
   "bmkg_temperature_c",
   "bmkg_humidity_pct",
   "bmkg_wind_ms",
@@ -124,6 +128,11 @@ export function buildBmkgCompareCsv(
     const bT = toNum(r.bmkg_temperature);
     const bH = toNum(r.bmkg_humidity);
     const bW = toNum(r.bmkg_wind_ms);
+    // Dihitung dari rata-rata suhu/kelembaban sensor di slot ini (bukan dari
+    // tabel terpisah) -- sama rumusnya dengan VPD yang tampil di kartu
+    // SensorCard/BmkgCompareCard. Kosong kalau slot ini tidak punya data
+    // sensor sama sekali.
+    const sVpd = sT !== null && sH !== null ? calcVPD(sT, sH) : null;
 
     const releasedMs = parseBmkgUtc(r.bmkg_analysis_utc);
 
@@ -137,6 +146,7 @@ export function buildBmkgCompareCsv(
         cell(sW),
         cell(r.sensor_wind_dir),
         cell(toNum(r.sensor_samples)),
+        cell(sVpd),
         cell(bT),
         cell(bH),
         cell(bW),
