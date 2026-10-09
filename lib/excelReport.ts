@@ -4,6 +4,8 @@ import { SANITY_RANGES } from "./config";
 import { DateRange, getPeriodRange } from "./dateRange";
 import { fetchReadings } from "./statsEngine";
 import { fetchRainfallBuckets } from "./rainfall";
+// calcVPD murni matematika (sama rumus yang dipakai di SensorCard/BmkgCompareCard/CSV).
+import { calcVPD } from "./rules/ruleEngine";
 
 export type ExcelGranularity = "hourly" | "weekly" | "monthly";
 
@@ -16,6 +18,9 @@ interface BucketStats {
   maxHum: number;
   avgHum: number;
   avgWind: number;
+  // Dihitung dari avgTemp & avgHum bucket ini (bukan rata-rata VPD per
+  // baris) -- pendekatan sama dengan kolom VPD di CSV export BMKG.
+  avgVpd: number;
   // Dari tabel rainfall_readings (sensor hujan terpisah). null = sensor
   // hujan tidak mengirim data pada periode ini.
   totalRain: number | null;
@@ -92,16 +97,19 @@ export function aggregateReadings(
       const temps = rows.map((r) => r.temperature);
       const hums = rows.map((r) => r.humidity);
       const winds = rows.map((r) => r.wind_speed);
+      const avgTemp = average(temps);
+      const avgHum = average(hums);
 
       return {
         period: formatBucketLabel(key, granularity),
         minTemp: Math.min(...temps),
         maxTemp: Math.max(...temps),
-        avgTemp: average(temps),
+        avgTemp,
         minHum: Math.min(...hums),
         maxHum: Math.max(...hums),
-        avgHum: average(hums),
+        avgHum,
         avgWind: average(winds),
+        avgVpd: calcVPD(avgTemp, avgHum),
         totalRain: rainByBucket[key] ?? null,
       };
     });
@@ -196,7 +204,7 @@ export async function buildExcelReport(params: {
 
   const sheet = workbook.addWorksheet("Laporan");
 
-  sheet.mergeCells("A1:I1");
+  sheet.mergeCells("A1:J1");
   sheet.getCell("A1").value = `Laporan ${GRANULARITY_LABEL[params.granularity]} — ${params.deviceLabel}`;
   sheet.getCell("A1").font = { bold: true, size: 14 };
 
@@ -209,6 +217,7 @@ export async function buildExcelReport(params: {
     "Max RH (%)",
     "Rata-rata RH (%)",
     "Rata-rata Angin (m/s)",
+    "Rata-rata VPD (kPa)",
     "Total Hujan (mm)",
   ];
   sheet.getRow(3).font = { bold: true };
@@ -223,6 +232,7 @@ export async function buildExcelReport(params: {
       Number(s.maxHum.toFixed(1)),
       Number(s.avgHum.toFixed(1)),
       Number(s.avgWind.toFixed(2)),
+      Number(s.avgVpd.toFixed(2)),
       s.totalRain === null ? null : Number(s.totalRain.toFixed(1)),
     ];
   });
