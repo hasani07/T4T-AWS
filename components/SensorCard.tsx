@@ -1,9 +1,19 @@
 import { DeviceWithLatestReading } from "@/lib/types";
 import { WIND_DIRECTION_LABELS } from "@/lib/config";
 import { isDeviceOnline, formatRelativeTime, formatDateTime } from "@/lib/deviceStatus";
-import { calcVPD, classifyVPD } from "@/lib/rules/ruleEngine";
+import { calcVPD, classifyVPD, classifyRisk, RiskLevel } from "@/lib/rules/ruleEngine";
 import StatusBadge from "./StatusBadge";
-import { Thermometer, Droplets, Wind, Compass, Gauge, LucideIcon } from "lucide-react";
+import {
+  Thermometer,
+  Droplets,
+  Wind,
+  Compass,
+  Gauge,
+  LucideIcon,
+  CheckCircle2,
+  AlertTriangle,
+  AlertOctagon,
+} from "lucide-react";
 
 const VPD_CLASS_LABEL: Record<string, string> = {
   rendah: "Rendah",
@@ -15,6 +25,26 @@ const VPD_CLASS_COLOR: Record<string, string> = {
   rendah: "#22C55E",
   sedang: "#F59E0B",
   tinggi: "#EF4444",
+};
+
+// Terjemahan level risiko (dari classifyRisk() di ruleEngine.ts) jadi badge
+// yang orang awam langsung paham tanpa perlu ngerti angka VPD/kPa-nya.
+const RISK_LABEL: Record<RiskLevel, string> = {
+  aman: "Aman",
+  waspada: "Waspada",
+  kritis: "Kritis",
+};
+
+const RISK_ICON: Record<RiskLevel, LucideIcon> = {
+  aman: CheckCircle2,
+  waspada: AlertTriangle,
+  kritis: AlertOctagon,
+};
+
+const RISK_STYLE: Record<RiskLevel, string> = {
+  aman: "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+  waspada: "bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300",
+  kritis: "bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300",
 };
 
 function MetricPill({
@@ -57,6 +87,10 @@ export default function SensorCard({
 
   const vpd = latest ? calcVPD(latest.temperature, latest.humidity) : null;
   const vpdClass = vpd !== null ? classifyVPD(vpd) : null;
+  const risk = latest
+    ? classifyRisk(latest.temperature, latest.humidity, latest.wind_speed)
+    : null;
+  const RiskIcon = risk ? RISK_ICON[risk.level] : null;
 
   return (
     <div className="rounded-3xl bg-surface p-5 shadow-[0_2px_24px_rgba(15,23,42,0.06)]">
@@ -67,6 +101,23 @@ export default function SensorCard({
 
       {latest ? (
         <>
+          {/* Kesimpulan "harus ngapain" dalam bahasa awam, diturunkan dari
+              classifyRisk() di ruleEngine.ts -- jadi orang tidak perlu ngerti
+              angka VPD/kPa dulu buat tahu situasinya aman/waspada/kritis. */}
+          {risk && RiskIcon && (
+            <div
+              className={`mt-4 flex items-start gap-2.5 rounded-2xl px-3.5 py-3 ${RISK_STYLE[risk.level]}`}
+            >
+              <RiskIcon size={18} strokeWidth={2.25} className="mt-0.5 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-sm font-semibold">{RISK_LABEL[risk.level]}</p>
+                <p className="mt-0.5 text-xs leading-snug opacity-90">
+                  {risk.explanation}
+                </p>
+              </div>
+            </div>
+          )}
+
           <div className="mt-4 grid grid-cols-2 gap-2.5">
             <MetricPill
               icon={Thermometer}
