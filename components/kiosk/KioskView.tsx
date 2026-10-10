@@ -223,7 +223,7 @@ export default function KioskView({
           </span>
         </div>
         <Link
-          href="/dashboard"
+          href="/"
           className="inline-flex items-center gap-1.5 rounded-full bg-surface/80 px-3.5 py-2 text-xs font-medium text-slate-600 shadow-sm backdrop-blur transition hover:bg-surface sm:text-sm"
         >
           <LayoutGrid size={14} strokeWidth={2.25} />
