@@ -5,7 +5,7 @@ import { fetchReadings, computeStats, computeDeltaPct, PeriodStats } from "./sta
 import { fetchRainfallTotal } from "./rainfall";
 import { DateRange, getPreviousRange } from "./dateRange";
 import { createQuickChartUrl } from "./quickchart";
-import { sendTelegramPhoto, sendTelegramMessage } from "./telegram";
+import { sendTelegramPhoto, sendTelegramMessage, escapeHtml } from "./telegram";
 import { getSetting } from "./settings";
 import { WIND_DIRECTION_LABELS } from "./config";
 
@@ -129,16 +129,20 @@ function formatStatsBlock(
     : "Tidak ada arah dominan (calm)";
 
   const lines = [
-    `📍 <b>${deviceLabel}</b>`,
+    `📍 <b>${escapeHtml(deviceLabel)}</b>`,
     `🌡️ Suhu rata-rata: <b>${stats.avgTemperature?.toFixed(1) ?? "-"}°C</b>${fmtDelta(deltaTemp)}`,
     `💧 Kelembaban rata-rata: <b>${stats.avgHumidity?.toFixed(0) ?? "-"}%</b>${fmtDelta(deltaHum)}`,
     `🌬️ Kecepatan angin rata-rata: <b>${stats.avgWindSpeed?.toFixed(1) ?? "-"} m/s</b>`,
     `🌧️ Total curah hujan: <b>${stats.totalRainfall?.toFixed(1) ?? "-"} mm</b>${fmtDelta(deltaRain)}`,
-    `🧭 Arah angin dominan: ${windLabel}`,
+    `🧭 Arah angin dominan: ${escapeHtml(windLabel)}`,
   ];
 
+  // escapeHtml WAJIB di sini -- `recommendation` teks bebas dari AI, bisa
+  // mengandung "<"/">" (mis. "<50%") yang kalau tidak di-escape bikin
+  // Telegram gagal parse SELURUH pesan (ini penyebab error "can't parse
+  // entities: Unsupported start tag" di tombol Generate Manual).
   if (recommendation) {
-    lines.push("", "💡 <i>Rekomendasi AI:</i>", recommendation);
+    lines.push("", "💡 <i>Rekomendasi AI:</i>", escapeHtml(recommendation));
   }
 
   return lines.join("\n");
