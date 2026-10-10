@@ -92,7 +92,14 @@ export default function RainfallCard({
             <p className="text-xs text-slate-400">Curah hujan · otomatis</p>
           </div>
         </div>
-        <StatusBadge online={online} />
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <StatusBadge online={online} />
+          {/* RSSI dari pengiriman terakhir (sama timestamp-nya dengan
+              "Update terakhir" di bawah -- satu baris di rainfall_readings). */}
+          {summary?.rssi_last !== null && summary?.rssi_last !== undefined && (
+            <RssiBadge rssi={summary.rssi_last} />
+          )}
+        </div>
       </div>
 
       {summary ? (
@@ -142,17 +149,10 @@ export default function RainfallCard({
       )}
 
       {lastReadingAt && (
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
-          <p className="text-xs text-slate-400">
-            Update terakhir: {formatDateTime(lastReadingAt)} ·{" "}
-            {formatRelativeTime(lastReadingAt)}
-          </p>
-          {/* RSSI dari pengiriman terakhir (sama timestamp-nya dengan
-              "Update terakhir" di atas -- satu baris di rainfall_readings). */}
-          {summary?.rssi_last !== null && summary?.rssi_last !== undefined && (
-            <RssiBadge rssi={summary.rssi_last} />
-          )}
-        </div>
+        <p className="mt-4 text-xs text-slate-400">
+          Update terakhir: {formatDateTime(lastReadingAt)} ·{" "}
+          {formatRelativeTime(lastReadingAt)}
+        </p>
       )}
     </div>
   );
