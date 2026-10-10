@@ -21,11 +21,12 @@ import { useNavigationProgress } from "./NavigationProgress";
 import ThemeToggle from "./ThemeToggle";
 
 const NAV_ITEMS = [
-  // "/" sekarang Mode Kiosk (beranda, lihat app/page.tsx) -- dashboard
-  // lengkap dipindah ke /dashboard. Nav ini DISEMBUNYIKAN TOTAL saat di "/"
-  // sendiri (lihat return null di bawah), supaya kiosk tampil layar penuh.
-  { href: "/", label: "Kiosk", icon: Tv },
-  { href: "/dashboard", label: "Dashboard", icon: LayoutGrid },
+  // "/" adalah Dashboard lengkap (beranda, lihat app/page.tsx). Mode Kiosk
+  // dipindah jadi pilihan opsional di /kiosk -- Nav ini DISEMBUNYIKAN TOTAL
+  // saat di /kiosk (lihat return null di bawah), supaya kiosk tampil layar
+  // penuh tanpa navigasi.
+  { href: "/", label: "Dashboard", icon: LayoutGrid },
+  { href: "/kiosk", label: "Kiosk", icon: Tv },
   { href: "/analytics", label: "Analitik", icon: BarChart3 },
   { href: "/bmkg", label: "BMKG", icon: CloudSun },
   { href: "/kuota", label: "Kuota", icon: Smartphone },
@@ -43,7 +44,7 @@ const NAV_ITEMS = [
 // susah dipencet tepat. Jadi hanya 4 yang paling sering dibuka yang tampil
 // langsung; sisanya (termasuk Kiosk) dibuka lewat tombol "Lainnya". Sidebar
 // desktop (ruang vertikalnya cukup) tetap memuat semua menu apa adanya.
-const PRIMARY_MOBILE_HREFS = ["/dashboard", "/analytics", "/bmkg", "/kuota"];
+const PRIMARY_MOBILE_HREFS = ["/", "/analytics", "/bmkg", "/kuota"];
 const primaryMobileItems = NAV_ITEMS.filter((item) => PRIMARY_MOBILE_HREFS.includes(item.href));
 const moreMobileItems = NAV_ITEMS.filter((item) => !PRIMARY_MOBILE_HREFS.includes(item.href));
 
@@ -93,11 +94,11 @@ export default function Nav() {
 
   const isMoreActive = moreMobileItems.some((item) => item.href === pathname);
 
-  // Mode Kiosk ("/") dimaksudkan layar-penuh tanpa navigasi (dipasang di
-  // TV/layar tanpa ada yang menjaga) -- sidebar/bottom-bar ini disembunyikan
-  // total di situ. KioskView.tsx punya tombol sendiri ("Lihat Dashboard")
-  // untuk kembali ke navigasi biasa.
-  if (pathname === "/") return null;
+  // Mode Kiosk ("/kiosk") dimaksudkan layar-penuh tanpa navigasi (dipasang
+  // di TV/layar tanpa ada yang menjaga) -- sidebar/bottom-bar ini
+  // disembunyikan total di situ. KioskView.tsx punya tombol sendiri
+  // ("Lihat Dashboard") untuk kembali ke navigasi biasa.
+  if (pathname === "/kiosk") return null;
 
   return (
     <Fragment>
