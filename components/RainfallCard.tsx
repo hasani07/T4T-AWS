@@ -8,6 +8,7 @@ import {
 import { classifyDailyRain, classifyHourlyRain } from "@/lib/rainfallClass";
 import StatusBadge from "./StatusBadge";
 import RainCategoryBadge from "./RainCategoryBadge";
+import RssiBadge from "./RssiBadge";
 import { CloudRain } from "lucide-react";
 
 function fmtMm(value: number): string {
@@ -141,10 +142,17 @@ export default function RainfallCard({
       )}
 
       {lastReadingAt && (
-        <p className="mt-4 text-xs text-slate-400">
-          Update terakhir: {formatDateTime(lastReadingAt)} ·{" "}
-          {formatRelativeTime(lastReadingAt)}
-        </p>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs text-slate-400">
+            Update terakhir: {formatDateTime(lastReadingAt)} ·{" "}
+            {formatRelativeTime(lastReadingAt)}
+          </p>
+          {/* RSSI dari pengiriman terakhir (sama timestamp-nya dengan
+              "Update terakhir" di atas -- satu baris di rainfall_readings). */}
+          {summary?.rssi_last !== null && summary?.rssi_last !== undefined && (
+            <RssiBadge rssi={summary.rssi_last} />
+          )}
+        </div>
       )}
     </div>
   );
