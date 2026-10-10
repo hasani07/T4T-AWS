@@ -133,14 +133,18 @@ export default async function HomePage() {
   return (
     <PageShell>
       <header className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-900">
-            Dashboard Monitoring Mikroklimat
-          </h1>
-          <p className="mt-1 text-sm text-slate-500">
-            AWS T4T — data langsung dari Supabase (read-only)
-          </p>
-        </div>
+        {/* public/atmosx-logo.png -- logo + wordmark, menggantikan judul teks.
+            Dibungkus kotak putih (fixed, bukan bg-surface) karena warna
+            logonya tetap (navy/teal), supaya tetap kebaca jelas walau web
+            lagi mode gelap. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/atmosx-logo.png"
+          alt="AtmosX"
+          width={932}
+          height={722}
+          className="h-14 w-auto rounded-2xl bg-white p-1.5 sm:h-16"
+        />
         <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center">
           {/* Mode ringkas yang geser otomatis -- cocok dipasang di layar/TV
               tanpa ada yang menjaga, lihat app/kiosk/page.tsx (KioskView). */}
