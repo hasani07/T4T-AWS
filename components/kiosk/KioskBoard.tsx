@@ -278,8 +278,26 @@ export default function KioskBoard({
   tempTrend?: TrendPoint[];
   rainTrend?: TrendPoint[];
 }) {
+  // Jumlah kolom kartu device MENGIKUTI JUMLAH DEVICE yang ada (bukan
+  // selalu dipatok 3) -- kalau cuma 2 device dipasang grid-cols-3 bikin
+  // kolom ke-3 kosong melompong di kanan layar (celah kosong di
+  // screenshot sebelumnya). Dibatasi max 3 kolom supaya kartu tidak
+  // terlalu kurus kalau device makin banyak.
+  const deviceCount = board.devices.length;
+  const deviceColsClass =
+    deviceCount <= 1
+      ? "grid-cols-1"
+      : deviceCount === 2
+        ? "grid-cols-1 sm:grid-cols-2"
+        : "grid-cols-1 sm:grid-cols-2 xl:grid-cols-3";
+
   return (
-    <div className="flex h-full w-full flex-col gap-4 overflow-y-auto px-4 pb-4 sm:gap-5 sm:px-6 sm:pb-6">
+    // Dipakai CSS Grid (bukan flex + flex-1) untuk 3 baris utama: baris 1
+    // (ringkasan+tren) dan baris 2 (peringatan) tinggi otomatis sesuai isi,
+    // baris 3 (grid-rows-[...1fr]) mengambil SISA tinggi layar yang masih
+    // ada. Ini lebih stabil lintas-browser dibanding menumpuk flex-1 di
+    // dalam flex-1 lagi (percobaan sebelumnya kadang gagal melar penuh).
+    <div className="grid h-full w-full grid-rows-[auto_auto_1fr] gap-4 px-4 pb-4 sm:gap-5 sm:px-6 sm:pb-6">
       {/* ---------- Ringkasan ---------- */}
       <div className="flex flex-col gap-3 sm:gap-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -350,15 +368,20 @@ export default function KioskBoard({
       <IssueBanner issues={board.issues} />
 
       {/* ---------- Kartu per lokasi ----------
-          `flex-1` + `auto-rows-fr`: kartu-kartu ini melar mengisi SISA
-          tinggi layar yang masih kosong di bawah ringkasan/tren/peringatan
-          di atas, bukan cuma setinggi isinya sendiri -- jadi makin sedikit
-          device terpasang, makin besar tiap kartunya (bukan makin banyak
-          area kosong di bawah). */}
-      <div className="grid flex-1 auto-rows-fr grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 xl:grid-cols-3">
-        {board.devices.map((d) => (
-          <DeviceCard key={d.deviceLabel} device={d} />
-        ))}
+          Baris ke-3 (1fr) di grid induk di atas sudah dapat SISA tinggi
+          layar secara pasti dari CSS Grid -- div pembungkus ini otomatis
+          melar (stretch, default grid) mengisi baris itu, lalu grid kartu
+          di dalamnya pakai h-full + auto-rows-fr supaya kartu ikut melar
+          mengisi tingginya, bukan cuma setinggi isinya sendiri. min-h-0 +
+          overflow-y-auto jaga-jaga kalau suatu saat device-nya banyak dan
+          tidak muat -- baru di situ discroll, bukan memaksa seluruh layar
+          ikut discroll. */}
+      <div className="min-h-0 overflow-y-auto">
+        <div className={`grid h-full auto-rows-fr gap-4 sm:gap-5 ${deviceColsClass}`}>
+          {board.devices.map((d) => (
+            <DeviceCard key={d.deviceLabel} device={d} />
+          ))}
+        </div>
       </div>
     </div>
   );
