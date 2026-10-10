@@ -24,6 +24,14 @@ import {
 // gelap juga) -- itu sebabnya sebelumnya teks jadi nyaris tak kelihatan.
 // Jadi di file ini: TIDAK ADA `dark:text-slate-*` / `dark:bg-slate-900`
 // dkk, sama seperti pola di SensorCard.tsx / RainfallCard.tsx.
+//
+// ⚠️ CATATAN LAYOUT: papan ini dipasang di TV/layar kiosk, jadi SENGAJA
+// dibuat mengisi TINGGI LAYAR PENUH (bukan cuma setinggi kontennya) lewat
+// `h-full` + `flex-1` berantai dari KioskView.tsx turun ke grid kartu
+// device di bawah (grid terakhir pakai `auto-rows-fr` supaya baris kartu
+// ikut melar membagi rata sisa tinggi layar) -- dan ukuran teks/ikon
+// dibuat jauh lebih besar dari dashboard biasa supaya terbaca dari jarak
+// jauh di layar TV.
 
 type Tint = "neutral" | "emerald" | "amber" | "rose";
 
@@ -42,8 +50,8 @@ function deviceTint(d: KioskDeviceCard): Tint {
 
 function OfflinePill() {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2.5 py-1 text-[11px] font-semibold text-rose-700 dark:bg-rose-500/15 dark:text-rose-300">
-      <WifiOff size={12} strokeWidth={2.5} />
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-100 px-3 py-1.5 text-sm font-semibold text-rose-700 dark:bg-rose-500/15 dark:text-rose-300 sm:text-base">
+      <WifiOff size={16} strokeWidth={2.5} />
       Offline
     </span>
   );
@@ -61,16 +69,19 @@ function StatTile({
   label: string;
 }) {
   return (
-    <div className="flex items-center gap-3 rounded-2xl bg-surface px-4 py-3 shadow-[0_2px_20px_rgba(15,23,42,0.06)]">
+    <div className="flex flex-1 items-center gap-3 rounded-2xl bg-surface px-4 py-4 shadow-[0_2px_20px_rgba(15,23,42,0.06)] sm:gap-4 sm:px-5 sm:py-5">
       <span
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white"
+        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-white sm:h-14 sm:w-14"
         style={{ backgroundColor: color }}
       >
-        <Icon size={18} strokeWidth={2.25} />
+        <Icon size={22} strokeWidth={2.25} className="sm:hidden" />
+        <Icon size={26} strokeWidth={2.25} className="hidden sm:block" />
       </span>
       <div className="min-w-0">
-        <p className="truncate text-lg font-bold tabular-nums text-slate-900">{value}</p>
-        <p className="truncate text-[11px] text-slate-400">{label}</p>
+        <p className="truncate text-2xl font-bold tabular-nums text-slate-900 sm:text-3xl lg:text-4xl">
+          {value}
+        </p>
+        <p className="truncate text-xs text-slate-400 sm:text-sm">{label}</p>
       </div>
     </div>
   );
@@ -97,95 +108,114 @@ function DeviceCard({ device }: { device: KioskDeviceCard }) {
   const rssiCategory = device.rssi !== null ? classifyRssi(device.rssi) : null;
 
   return (
-    <div className={`flex flex-col gap-3 rounded-3xl p-4 shadow-[0_2px_24px_rgba(15,23,42,0.06)] sm:p-5 ${CARD_TINT[deviceTint(device)]}`}>
+    <div
+      className={`flex h-full flex-col justify-between gap-4 rounded-3xl p-5 shadow-[0_2px_24px_rgba(15,23,42,0.06)] sm:gap-5 sm:p-7 ${CARD_TINT[deviceTint(device)]}`}
+    >
       <div className="flex items-center justify-between gap-2">
-        <h2 className="text-base font-bold text-slate-900 sm:text-lg">{device.deviceLabel}</h2>
+        <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl">{device.deviceLabel}</h2>
         {device.issues.length === 0 ? (
-          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
-            <CheckCircle2 size={12} strokeWidth={2.5} />
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1.5 text-sm font-semibold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300 sm:text-base">
+            <CheckCircle2 size={16} strokeWidth={2.5} />
             Normal
           </span>
         ) : (
-          !device.weatherOnline &&
-          !device.rainOnline && <OfflinePill />
+          !device.weatherOnline && !device.rainOnline && <OfflinePill />
         )}
       </div>
 
-      {/* ---- Cuaca ---- */}
-      <div className="flex items-center justify-between gap-3 rounded-2xl bg-surface/70 px-3.5 py-3">
-        <div className="flex items-center gap-2.5">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white" style={{ backgroundColor: "#FB923C" }}>
-            <Thermometer size={16} strokeWidth={2.25} />
-          </span>
-          <div>
-            {device.weatherOnline && device.temperature !== null ? (
-              <p className="text-2xl font-bold tabular-nums text-slate-900">
-                {device.temperature.toFixed(1)}
-                <span className="text-sm font-semibold text-slate-400">°C</span>
-              </p>
-            ) : (
-              <OfflinePill />
+      <div className="flex flex-1 flex-col justify-center gap-4 sm:gap-5">
+        {/* ---- Cuaca ---- */}
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-surface/70 px-4 py-4 sm:px-5">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <span
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-white sm:h-14 sm:w-14"
+              style={{ backgroundColor: "#FB923C" }}
+            >
+              <Thermometer size={22} strokeWidth={2.25} />
+            </span>
+            <div>
+              {device.weatherOnline && device.temperature !== null ? (
+                <p className="text-4xl font-bold tabular-nums text-slate-900 sm:text-5xl lg:text-6xl">
+                  {device.temperature.toFixed(1)}
+                  <span className="text-lg font-semibold text-slate-400 sm:text-xl">°C</span>
+                </p>
+              ) : (
+                <OfflinePill />
+              )}
+              <p className="text-xs text-slate-400 sm:text-sm">Suhu</p>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+            {device.weatherOnline && device.humidity !== null && (
+              <div className="flex items-center gap-2 text-right">
+                <Droplets size={20} strokeWidth={2.25} className="text-sky-500" />
+                <span className="text-xl font-semibold tabular-nums text-slate-700 sm:text-2xl">
+                  {device.humidity.toFixed(0)}%
+                </span>
+              </div>
             )}
-            <p className="text-[11px] text-slate-400">Suhu</p>
-          </div>
-        </div>
-        {device.weatherOnline && device.humidity !== null && (
-          <div className="flex items-center gap-1.5 text-right">
-            <Droplets size={14} strokeWidth={2.25} className="text-sky-500" />
-            <span className="text-sm font-semibold tabular-nums text-slate-700">
-              {device.humidity.toFixed(0)}%
-            </span>
-          </div>
-        )}
-        {device.weatherOnline && device.windSpeed !== null && (
-          <div className="flex items-center gap-1.5 text-right">
-            <Wind size={14} strokeWidth={2.25} className="text-violet-500" />
-            <span className="text-sm font-semibold tabular-nums text-slate-700">
-              {device.windSpeed.toFixed(1)} m/s
-            </span>
-          </div>
-        )}
-      </div>
-
-      {device.riskLevel && RiskIcon && (
-        <div className={`flex items-start gap-2.5 rounded-2xl px-3.5 py-2.5 text-left ${RISK_PILL[device.riskLevel]}`}>
-          <RiskIcon size={18} strokeWidth={2.25} className="mt-0.5 shrink-0" />
-          <div className="min-w-0">
-            <p className="text-sm font-bold">{RISK_LABEL[device.riskLevel]}</p>
-            <p className="text-xs leading-snug opacity-90">{device.riskExplanation}</p>
-          </div>
-        </div>
-      )}
-
-      {/* ---- Hujan ---- */}
-      <div className="flex items-center justify-between gap-3 rounded-2xl bg-surface/70 px-3.5 py-3">
-        <div className="flex items-center gap-2.5">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white" style={{ backgroundColor: "#22D3EE" }}>
-            <CloudRain size={16} strokeWidth={2.25} />
-          </span>
-          <div>
-            {device.rainOnline && device.todayMm !== null ? (
-              <p className="text-2xl font-bold tabular-nums text-slate-900">
-                {device.todayMm.toFixed(1)}
-                <span className="text-sm font-semibold text-slate-400"> mm</span>
-              </p>
-            ) : (
-              <OfflinePill />
+            {device.weatherOnline && device.windSpeed !== null && (
+              <div className="flex items-center gap-2 text-right">
+                <Wind size={20} strokeWidth={2.25} className="text-violet-500" />
+                <span className="text-xl font-semibold tabular-nums text-slate-700 sm:text-2xl">
+                  {device.windSpeed.toFixed(1)} m/s
+                </span>
+              </div>
             )}
-            <p className="text-[11px] text-slate-400">Hujan hari ini</p>
           </div>
         </div>
-        {rssiCategory && device.rssi !== null && (
-          <div className="flex items-center gap-1.5 rounded-full px-2.5 py-1">
-            <Signal size={14} strokeWidth={2.25} className={rssiCategory.dotClass.replace("bg-", "text-")} />
-            <span className="text-xs font-semibold tabular-nums text-slate-700">
-              {device.rssi} dBm · {rssiCategory.label}
-            </span>
+
+        {device.riskLevel && RiskIcon && (
+          <div
+            className={`flex items-start gap-3 rounded-2xl px-4 py-3.5 text-left sm:px-5 ${RISK_PILL[device.riskLevel]}`}
+          >
+            <RiskIcon size={24} strokeWidth={2.25} className="mt-0.5 shrink-0" />
+            <div className="min-w-0">
+              <p className="text-lg font-bold sm:text-xl">{RISK_LABEL[device.riskLevel]}</p>
+              <p className="mt-0.5 text-sm leading-snug opacity-90 sm:text-base">
+                {device.riskExplanation}
+              </p>
+            </div>
           </div>
         )}
+
+        {/* ---- Hujan ---- */}
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-surface/70 px-4 py-4 sm:px-5">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <span
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-white sm:h-14 sm:w-14"
+              style={{ backgroundColor: "#22D3EE" }}
+            >
+              <CloudRain size={22} strokeWidth={2.25} />
+            </span>
+            <div>
+              {device.rainOnline && device.todayMm !== null ? (
+                <p className="text-4xl font-bold tabular-nums text-slate-900 sm:text-5xl lg:text-6xl">
+                  {device.todayMm.toFixed(1)}
+                  <span className="text-lg font-semibold text-slate-400 sm:text-xl"> mm</span>
+                </p>
+              ) : (
+                <OfflinePill />
+              )}
+              <p className="text-xs text-slate-400 sm:text-sm">Hujan hari ini</p>
+            </div>
+          </div>
+          {rssiCategory && device.rssi !== null && (
+            <div className="flex items-center gap-2 rounded-full px-2.5 py-1.5">
+              <Signal
+                size={20}
+                strokeWidth={2.25}
+                className={rssiCategory.dotClass.replace("bg-", "text-")}
+              />
+              <span className="text-lg font-semibold tabular-nums text-slate-700 sm:text-xl">
+                {device.rssi} dBm · {rssiCategory.label}
+              </span>
+            </div>
+          )}
+        </div>
       </div>
 
-      <p className="text-[11px] text-slate-400">
+      <p className="text-xs text-slate-400 sm:text-sm">
         {device.weatherLastReadingAt
           ? `Cuaca update ${formatRelativeTime(device.weatherLastReadingAt)}`
           : "Belum ada data cuaca"}
@@ -201,30 +231,32 @@ function DeviceCard({ device }: { device: KioskDeviceCard }) {
 function IssueBanner({ issues }: { issues: KioskIssue[] }) {
   if (issues.length === 0) {
     return (
-      <div className="flex items-center gap-2.5 rounded-2xl bg-emerald-100 px-4 py-2.5 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
-        <CheckCircle2 size={18} strokeWidth={2.25} className="shrink-0" />
-        <p className="text-sm font-semibold">Semua lokasi normal -- tidak ada gangguan.</p>
+      <div className="flex items-center gap-3 rounded-2xl bg-emerald-100 px-5 py-3 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+        <CheckCircle2 size={22} strokeWidth={2.25} className="shrink-0" />
+        <p className="text-base font-semibold sm:text-lg">
+          Semua lokasi normal -- tidak ada gangguan.
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-2">
       {issues.map((issue, i) => (
         <div
           key={i}
-          className={`flex items-center gap-2.5 rounded-2xl px-4 py-2 text-left ${
+          className={`flex items-center gap-3 rounded-2xl px-5 py-3 text-left ${
             issue.severity === "critical"
               ? "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300"
               : "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300"
           }`}
         >
           {issue.severity === "critical" ? (
-            <AlertOctagon size={16} strokeWidth={2.25} className="shrink-0" />
+            <AlertOctagon size={20} strokeWidth={2.25} className="shrink-0" />
           ) : (
-            <AlertTriangle size={16} strokeWidth={2.25} className="shrink-0" />
+            <AlertTriangle size={20} strokeWidth={2.25} className="shrink-0" />
           )}
-          <p className="text-sm font-medium">{issue.message}</p>
+          <p className="text-base font-medium sm:text-lg">{issue.message}</p>
         </div>
       ))}
     </div>
@@ -233,7 +265,8 @@ function IssueBanner({ issues }: { issues: KioskIssue[] }) {
 
 /**
  * Papan kiosk SATU LAYAR PENUH -- semua info (ringkasan, tren, tiap
- * lokasi, dan peringatan) tampil sekaligus, tidak digeser otomatis.
+ * lokasi, dan peringatan) tampil sekaligus, tidak digeser otomatis, dan
+ * MENGISI SELURUH TINGGI LAYAR (bukan nempel di atas lalu sisanya kosong).
  * Data tetap segar sendiri lewat polling di KioskView.tsx.
  */
 export default function KioskBoard({
@@ -246,13 +279,15 @@ export default function KioskBoard({
   rainTrend?: TrendPoint[];
 }) {
   return (
-    <div className="flex h-full w-full flex-col gap-4 overflow-y-auto px-4 pb-4 sm:px-6 sm:pb-6">
+    <div className="flex h-full w-full flex-col gap-4 overflow-y-auto px-4 pb-4 sm:gap-5 sm:px-6 sm:pb-6">
       {/* ---------- Ringkasan ---------- */}
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-3 sm:gap-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h1 className="text-lg font-bold text-slate-900 sm:text-xl">Ringkasan Saat Ini</h1>
+          <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl lg:text-4xl">
+            Ringkasan Saat Ini
+          </h1>
           <span
-            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold sm:text-sm ${
+            className={`inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-base font-semibold sm:text-lg ${
               board.devicesOnline === board.devicesTotal && board.devicesTotal > 0
                 ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
                 : "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300"
@@ -262,7 +297,7 @@ export default function KioskBoard({
           </span>
         </div>
 
-        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 sm:gap-3">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
           <StatTile
             icon={Thermometer}
             color="#FB923C"
@@ -290,16 +325,20 @@ export default function KioskBoard({
         </div>
 
         {(tempTrend || rainTrend) && (
-          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
             {tempTrend && (
-              <div className="flex flex-col items-center gap-1 rounded-2xl bg-surface px-4 py-3 shadow-[0_2px_20px_rgba(15,23,42,0.06)]">
-                <p className="text-xs font-semibold text-slate-500">Tren Suhu (6 jam)</p>
+              <div className="flex flex-col items-center gap-1.5 rounded-2xl bg-surface px-4 py-4 shadow-[0_2px_20px_rgba(15,23,42,0.06)] sm:px-5">
+                <p className="text-sm font-semibold text-slate-500 sm:text-base">
+                  Tren Suhu (6 jam)
+                </p>
                 <MiniLineChart points={tempTrend} color="#FB923C" />
               </div>
             )}
             {rainTrend && (
-              <div className="flex flex-col items-center gap-1 rounded-2xl bg-surface px-4 py-3 shadow-[0_2px_20px_rgba(15,23,42,0.06)]">
-                <p className="text-xs font-semibold text-slate-500">Tren Hujan per Jam (6 jam)</p>
+              <div className="flex flex-col items-center gap-1.5 rounded-2xl bg-surface px-4 py-4 shadow-[0_2px_20px_rgba(15,23,42,0.06)] sm:px-5">
+                <p className="text-sm font-semibold text-slate-500 sm:text-base">
+                  Tren Hujan per Jam (6 jam)
+                </p>
                 <MiniBarChart points={rainTrend} color="#22D3EE" />
               </div>
             )}
@@ -310,8 +349,13 @@ export default function KioskBoard({
       {/* ---------- Peringatan / gangguan ---------- */}
       <IssueBanner issues={board.issues} />
 
-      {/* ---------- Kartu per lokasi ---------- */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      {/* ---------- Kartu per lokasi ----------
+          `flex-1` + `auto-rows-fr`: kartu-kartu ini melar mengisi SISA
+          tinggi layar yang masih kosong di bawah ringkasan/tren/peringatan
+          di atas, bukan cuma setinggi isinya sendiri -- jadi makin sedikit
+          device terpasang, makin besar tiap kartunya (bukan makin banyak
+          area kosong di bawah). */}
+      <div className="grid flex-1 auto-rows-fr grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 xl:grid-cols-3">
         {board.devices.map((d) => (
           <DeviceCard key={d.deviceLabel} device={d} />
         ))}
