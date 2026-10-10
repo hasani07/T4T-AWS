@@ -4,8 +4,8 @@ import { DeviceWithLatestReading } from "./types";
 /**
  * Daftar device + pembacaan sensor cuaca TERAKHIR masing-masing.
  *
- * Dipakai bersama oleh dashboard (SSR awal, app/dashboard/page.tsx) dan
- * kiosk (SSR awal + polling berkala di browser, app/page.tsx +
+ * Dipakai bersama oleh dashboard (SSR awal, app/page.tsx) dan kiosk (SSR
+ * awal + polling berkala di browser, app/kiosk/page.tsx +
  * components/kiosk/*) -- diekstrak ke sini supaya query-nya satu tempat,
  * bukan diduplikasi di kedua halaman.
  *
