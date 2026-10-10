@@ -112,7 +112,7 @@ export function OverviewSlide({
       </div>
 
       {/* Tren singkat beberapa jam terakhir -- sekadar rasa arah, bukan
-          pengganti grafik lengkap di /dashboard -> Analitik. */}
+          pengganti grafik lengkap di Dashboard ("/") -> Analitik. */}
       {(tempTrend || rainTrend) && (
         <div className="flex w-full max-w-3xl flex-col gap-4 sm:flex-row sm:justify-center sm:gap-10">
           {tempTrend && (
