@@ -155,10 +155,6 @@ export default async function HomePage() {
         </div>
       </header>
 
-      <DeviceStatusOverview devices={devices} initial={initialLastSeen} />
-
-      <DeviceUptimePanel devices={devices} />
-
       <div className="mb-6 grid grid-cols-2 gap-3 md:flex md:flex-wrap">
         {avgTemp !== null && (
           <SummaryPill
@@ -196,6 +192,16 @@ export default async function HomePage() {
 
       <div className="mt-6">
         <RainfallCardGrid devices={devices} initialData={rainfalls} />
+      </div>
+
+      {/* Status online/offline + riwayat uptime per alat -- info lebih
+          teknis/rinci, jadi ditaruh di bawah ringkasan utama, bukan di atas. */}
+      <div className="mt-6">
+        <DeviceStatusOverview devices={devices} initial={initialLastSeen} />
+      </div>
+
+      <div className="mt-6">
+        <DeviceUptimePanel devices={devices} />
       </div>
 
       <div className="mt-6">
