@@ -1,5 +1,5 @@
 /*
- * Rainfall logger CIMINYAK: DFRobot SEN0575 (I2C) + ESP32-C3 -> Supabase
+ * Rainfall logger CISANGKUY: DFRobot SEN0575 (I2C) + ESP32-C3 -> Supabase
  * (OTA + log jarak jauh via device_logs/device_console TETAP ADA - lihat PANDUAN)
  *
  * - Baca sensor tiap 10 detik (6 pembacaan = 1 menit)
@@ -17,19 +17,19 @@
  *   Jadi interval sampling diperlonggar dari 2 detik -> 10 detik TANPA kehilangan
  *   presisi curah hujan, cuma mengurangi jumlah pembacaan I2C per menit (30 -> 6).
  *
- *   TAMBAHAN: daya pancar WiFi sekarang ADAPTIF (lihat bagian WIFI_TX_POWER_*
- *   di bawah) -- dicoba daya tinggi dulu untuk sinyal lebih kuat, otomatis
- *   turun ke daya rendah kalau board-nya ternyata tidak bisa connect di daya
- *   tinggi (masalah umum di sebagian board ESP32-C3 kecil/"SuperMini").
+ *   TAMBAHAN: daya pancar WiFi di-SET LANGSUNG ke daya rendah (lihat
+ *   WIFI_TX_POWER di bawah). Sebelumnya ada logika adaptif (coba daya tinggi
+ *   dulu, fallback ke rendah kalau gagal connect dalam 45 detik), tapi di
+ *   lapangan SEMUA board (Cisangkuy & Ciminyak) selalu berakhir di daya
+ *   rendah -- board ESP32-C3 kecil/"SuperMini" ini memang tidak bisa connect
+ *   di daya tinggi (WiFi tetap TERDETEKSI, tapi gagal connect). Jadi logika
+ *   adaptif itu dihapus: langsung pakai daya rendah dari awal, supaya boot
+ *   tidak lagi menunggu percobaan daya tinggi yang pasti gagal.
  *
- * PENTING (kenapa file ini dibuat): firmware v10 yang sempat terpasang di
- * Ciminyak lewat OTA adalah versi SEDERHANA yang TIDAK punya kode OTA/log ini
- * sama sekali, jadi sejak itu Ciminyak tidak lagi bisa dicek/di-update jarak
- * jauh walau data sensornya tetap normal masuk ke Supabase. File ini
- * menggabungkan balik: OTA + log jarak jauh (dari firmware lama) + semua
- * perbaikan efisiensi & WiFi (dari firmware v10). WAJIB diflash manual lewat
- * USB sekali (OTA tidak bisa memperbaiki dirinya sendiri kalau OTA-nya
- * hilang) - lihat FW_VERSION di bawah untuk alasan nomornya dinaikkan.
+ * CATATAN: file ini adalah firmware yang sama dengan versi Ciminyak (OTA +
+ * log jarak jauh + perbaikan efisiensi & WiFi daya rendah), hanya DEVICE_ID
+ * yang dibedakan (1 = Cisangkuy). WAJIB diflash manual lewat USB sekali
+ * untuk memasukkan perubahan TX power ini - lihat FW_VERSION di bawah.
  *
  * SERIAL MONITOR WEB (device_console): sekarang menampung SEMUA kejadian
  * penting (WiFi connect/putus, RSSI, upload OK/GAGAL, sensor zero-streak,
@@ -59,7 +59,7 @@
 // =====================================================
 //                    KONFIGURASI
 // =====================================================
-const char* WIFI_SSID = "NodeSensorWiFi1";   // SSID lokasi Ciminyak
+const char* WIFI_SSID = "NodeSensorWiFi1";   // SSID lokasi (sama dengan Ciminyak)
 const char* WIFI_PASS = "muhammadnabiyullah";
 
 // Supabase
@@ -69,7 +69,7 @@ const char *supabaseTable     = "rainfall_readings";
 // ID device (tabel rainfall_readings). Sama dengan id weather station di lokasi yang sama:
 //   1 = Cisangkuy   |   2 = Ciminyak
 // (tabelnya beda dengan weather station yang menulis ke tabel sensors, jadi tidak bentrok)
-const int   DEVICE_ID         = 2;   // Ciminyak
+const int   DEVICE_ID         = 1;   // Cisangkuy
 
 // Pin I2C ESP32-C3 (sesuaikan dengan wiring kamu!)
 #define I2C_SDA_PIN 1
@@ -89,7 +89,7 @@ const int   DST_OFFSET_SEC = 0;
 // Data tersimpan di memori ESP (akumulasi harian + hujan yang belum terkirim) dihapus
 // SEKALI saat angka ini berubah dari nilai yang tersimpan. Berguna untuk membuang sisa
 // data tes. Naikkan angkanya (2 -> 3 -> ...) kalau suatu saat perlu mengulang.
-#define STATE_VERSION 11   // dinaikkan dari firmware v10 sebelumnya (hapus sisa data lama sekali)
+#define STATE_VERSION 13   // dinaikkan dari firmware v10 sebelumnya (hapus sisa data lama sekali)
 
 // Sampling. Sensor melaporkan COUNTER KUMULATIF (jumlah guling), bukan nilai
 // sesaat -- jadi memperlambat sampling TIDAK membuang data hujan (lihat
@@ -102,16 +102,12 @@ const uint8_t  SAMPLES_PER_MINUTE  = 6;     // 6 x 10 detik = 60 detik
 const uint32_t WIFI_RETRY_MS           = 60000;              // coba sambung ulang tiap 60 detik (10 detik terlalu rapat: memutus koneksi yang lambat)
 const uint32_t WIFI_RESTART_AFTER_MS   = 10UL * 60UL * 1000UL; // restart ESP kalau WiFi putus > 10 menit
 
-// Daya pancar WiFi: ADAPTIF. Dicoba daya TINGGI dulu tiap kali boot (sinyal
-// lebih kuat -> upload lebih stabil kalau device jauh dari router). Kalau
-// sampai WIFI_HIGH_POWER_TIMEOUT_MS tidak berhasil connect SAMA SEKALI,
-// otomatis turun ke daya RENDAH -- sebagian board ESP32-C3 kecil/"SuperMini"
-// punya masalah radio dan JUSTRU hanya bisa connect di daya rendah. Begitu
-// pernah turun, pilihan itu DIINGAT (disimpan di memori), jadi nyala
-// berikutnya langsung pakai daya rendah tanpa menunggu timeout lagi.
-const wifi_power_t WIFI_TX_POWER_HIGH          = WIFI_POWER_19_5dBm; // maksimal
-const wifi_power_t WIFI_TX_POWER_LOW           = WIFI_POWER_8_5dBm;  // fallback aman (nilai lama)
-const uint32_t      WIFI_HIGH_POWER_TIMEOUT_MS = 45000;              // 45 detik dicoba di daya tinggi
+// Daya pancar WiFi: LANGSUNG daya rendah, tidak ada lagi percobaan daya
+// tinggi. Board ESP32-C3 kecil/"SuperMini" di semua lokasi (Cisangkuy &
+// Ciminyak) terbukti selalu gagal connect di daya tinggi (walau WiFi tetap
+// terdeteksi), jadi percobaan daya tinggi di awal cuma buang waktu boot
+// tanpa pernah berhasil.
+const wifi_power_t WIFI_TX_POWER = WIFI_POWER_8_5dBm;
 
 // Sensor
 const uint32_t SENSOR_RETRY_MS = 5000;   // kalau sensor belum terdeteksi, coba lagi tiap 5 detik
@@ -149,12 +145,11 @@ const uint8_t  UPLOAD_FAIL_RESTART   = 10; // 10 menit upload gagal -> restart E
 // upload .bin baru lewat halaman admin, dan isi angka yang SAMA di form upload-nya.
 // (Kalau lupa menaikkan, lihat catatan appliedFwVersion di bawah - ada pengaman kedua
 // supaya ESP tidak flash ulang versi yang sama berkali-kali.)
-// SENGAJA 11, bukan 2: firmware v10 yang pernah diupload lewat halaman admin untuk
-// Ciminyak adalah versi SEDERHANA tanpa OTA (lihat catatan di atas file). Kalau nomor
-// ini dibiarkan lebih kecil dari 10, begitu device ini nyala dia akan menganggap v10
-// itu "lebih baru" dan langsung OTA mengunduh balik firmware yang sama (tanpa OTA)
-// itu lagi dalam 2 menit -- jadi harus LEBIH BESAR dari 10 di sini.
-const int FW_VERSION = 11;
+// CATATAN: pastikan angka ini LEBIH BESAR dari versi terakhir yang pernah
+// diupload untuk Cisangkuy lewat halaman admin OTA (apa pun nomornya) --
+// kalau lebih kecil/sama, ESP akan mengunduh ulang firmware lama itu lewat
+// OTA 2 menit setelah boot.
+const int FW_VERSION = 13;   // samakan dengan versi Ciminyak: kirim RSSI di tiap upload (lihat uploadToSupabase)
 
 // Cek firmware baru tiap berapa lama. 2 menit: cukup responsif, dan satu kali cek
 // hanya 1 request HTTP kecil (bukan download), jadi murah walau sering.
@@ -209,7 +204,6 @@ uint32_t lastWifiAttemptMs = 0;
 uint32_t wifiDownSince     = 0;
 bool     wifiDown          = false;
 bool     timeConfigured    = false;
-bool     usingLowTxPower   = false;  // true = sedang pakai daya rendah (hasil fallback / tersimpan)
 
 // Status OTA
 uint32_t lastOtaCheckMs  = 0;
@@ -300,18 +294,7 @@ void vlog(const char* fmt, ...) {
 
 // ---------- WiFi: dicoba terus sampai tersambung ----------
 void applyTxPower() {
-  WiFi.setTxPower(usingLowTxPower ? WIFI_TX_POWER_LOW : WIFI_TX_POWER_HIGH);
-}
-
-// Dipanggil kalau daya TINGGI terbukti tidak berhasil connect sama sekali
-// dalam WIFI_HIGH_POWER_TIMEOUT_MS. Turun ke daya rendah dan SIMPAN pilihan
-// itu, supaya nyala berikutnya tidak perlu menunggu timeout yang sama lagi.
-void fallbackToLowTxPower() {
-  if (usingLowTxPower) return;   // sudah di daya rendah, tidak ada yang perlu dilakukan
-  usingLowTxPower = true;
-  prefs.putBool("txLow", true);
-  vlog("!!! Tidak berhasil connect WiFi di daya TINGGI -> turun ke daya RENDAH (tersimpan, dipakai mulai sekarang).");
-  applyTxPower();
+  WiFi.setTxPower(WIFI_TX_POWER);
 }
 
 // Diagnosis: tampilkan WiFi yang terlihat oleh ESP, dan apakah SSID kamu ada
@@ -347,11 +330,6 @@ void startWiFi() {
 // Dipanggil terus-menerus dari loop(). Tidak memblokir, jadi sensor tetap dibaca
 // walaupun WiFi sedang putus.
 void maintainWiFi() {
-  // Catatan: fallback daya rendah SENGAJA tidak dicek di sini. Fungsi ini
-  // juga menangani WiFi yang putus sesaat di tengah operasi normal (router
-  // reboot, gangguan sebentar) -- itu bukan indikasi board bermasalah di daya
-  // tinggi, jadi tidak boleh memicu turun ke daya rendah. Fallback hanya
-  // terjadi sekali lewat waitForWiFi() saat baru menyala (lihat di bawah).
   if (WiFi.status() == WL_CONNECTED) {
     if (wifiDown) {
       wifiDown = false;
@@ -401,27 +379,14 @@ void waitForWiFi() {
   scanNetworks();   // diagnosis: apakah SSID terlihat oleh ESP?
   startWiFi();
   Serial.print("Menghubungkan WiFi");
-  uint32_t waitStart = millis();
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
     esp_task_wdt_reset();   // menunggu WiFi itu normal, bukan hang (ada batas 10 menit sendiri)
     maintainWiFi();
-
-    // Khusus di percobaan AWAL ini (bukan saat reconnect biasa di tengah
-    // jalan -- lihat catatan di maintainWiFi): kalau daya tinggi ternyata
-    // tidak kunjung berhasil, turun ke daya rendah dan beri kesempatan penuh
-    // lagi di daya baru itu.
-    if (!usingLowTxPower && millis() - waitStart >= WIFI_HIGH_POWER_TIMEOUT_MS) {
-      fallbackToLowTxPower();
-      WiFi.disconnect();
-      WiFi.begin(WIFI_SSID, WIFI_PASS);
-      waitStart = millis();
-    }
   }
   maintainWiFi();   // cetak IP + mulai NTP
-  vlog("Kekuatan sinyal (RSSI): %d dBm (daya pancar: %s)",
-       WiFi.RSSI(), usingLowTxPower ? "RENDAH" : "TINGGI");
+  vlog("Kekuatan sinyal (RSSI): %d dBm (daya pancar: RENDAH)", WiFi.RSSI());
 }
 
 // Kode "hari" (YYYYMMDD) yang berganti tepat di jam reset (RESET_HOUR:RESET_MINUTE).
@@ -622,11 +587,13 @@ bool uploadToSupabase(float rainMm, float dailyMm) {
 
   // rain_mm  = hujan sejak pengiriman sukses sebelumnya (dipakai untuk akumulasi 1/3/6/12/24 jam)
   // rainfall = akumulasi hujan hari ini sejak 00:00 WIB
+  // rssi     = kekuatan sinyal WiFi (dBm, negatif) SAAT upload ini, supaya dashboard
+  //            bisa menampilkan status sinyal per lokasi (lihat supabase/sql/015_rainfall_rssi.sql)
   // (id & created_at diisi otomatis oleh Supabase)
-  char payload[160];
+  char payload[180];
   snprintf(payload, sizeof(payload),
-           "{\"device_id\":%d,\"rain_mm\":%.4f,\"rainfall\":%.2f}",
-           DEVICE_ID, rainMm, dailyMm);
+           "{\"device_id\":%d,\"rain_mm\":%.4f,\"rainfall\":%.2f,\"rssi\":%d}",
+           DEVICE_ID, rainMm, dailyMm, WiFi.RSSI());
 
   int code = http.POST((uint8_t*)payload, strlen(payload));
   vlog("Upload -> HTTP %d | RSSI %d dBm | %s", code, WiFi.RSSI(), payload);
@@ -1017,7 +984,6 @@ void setup() {
     lastTips = prefs.getUInt("tips", 0);
     haveLast = true;
   }
-  usingLowTxPower = prefs.getBool("txLow", false);   // hasil fallback dari nyala sebelumnya (kalau ada)
   // Versi firmware yang TERTANAM SAAT INI. Kalau belum pernah di-OTA, defaultnya
   // ya FW_VERSION yang di-compile (lihat komentar appliedFwVersion di atas).
   appliedFwVersion = prefs.getInt("fwver", FW_VERSION);
