@@ -4,6 +4,23 @@
 
 const TELEGRAM_API = "https://api.telegram.org";
 
+/**
+ * Semua pesan di sini dikirim dengan parse_mode: "HTML" (lihat
+ * sendTelegramMessage/sendTelegramPhoto di bawah), jadi karakter < > &
+ * di teks APAPUN yang bukan tag kita sendiri -- terutama teks bebas dari
+ * AI (rekomendasi mingguan, lib/weeklyReport.ts) -- HARUS di-escape dulu
+ * sebelum disisipkan. Kalau tidak, teks yang kebetulan mengandung mis.
+ * "<50%" bikin Telegram mengira "<50%." itu tag HTML yang belum ditutup,
+ * dan SELURUH pesan gagal terkirim (error: "can't parse entities:
+ * Unsupported start tag ..."), bukan cuma bagian itu saja.
+ */
+export function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
 function getTelegramConfig() {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.TELEGRAM_CHAT_ID;
