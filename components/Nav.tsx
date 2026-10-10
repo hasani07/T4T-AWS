@@ -14,13 +14,18 @@ import {
   Terminal,
   Smartphone,
   MoreHorizontal,
+  Tv,
   X,
 } from "lucide-react";
 import { useNavigationProgress } from "./NavigationProgress";
 import ThemeToggle from "./ThemeToggle";
 
 const NAV_ITEMS = [
-  { href: "/", label: "Dashboard", icon: LayoutGrid },
+  // "/" sekarang Mode Kiosk (beranda, lihat app/page.tsx) -- dashboard
+  // lengkap dipindah ke /dashboard. Nav ini DISEMBUNYIKAN TOTAL saat di "/"
+  // sendiri (lihat return null di bawah), supaya kiosk tampil layar penuh.
+  { href: "/", label: "Kiosk", icon: Tv },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutGrid },
   { href: "/analytics", label: "Analitik", icon: BarChart3 },
   { href: "/bmkg", label: "BMKG", icon: CloudSun },
   { href: "/kuota", label: "Kuota", icon: Smartphone },
@@ -34,11 +39,11 @@ const NAV_ITEMS = [
   { href: "/rainfall-monitor", label: "Monitor", icon: Terminal },
 ];
 
-// Bar bawah (HP) sudah penuh kalau memuat semua 10 menu — ikon jadi kecil dan
+// Bar bawah (HP) sudah penuh kalau memuat semua menu — ikon jadi kecil dan
 // susah dipencet tepat. Jadi hanya 4 yang paling sering dibuka yang tampil
-// langsung; sisanya dibuka lewat tombol "Lainnya". Sidebar desktop (ruang
-// vertikalnya cukup) tetap memuat semua menu apa adanya.
-const PRIMARY_MOBILE_HREFS = ["/", "/analytics", "/bmkg", "/kuota"];
+// langsung; sisanya (termasuk Kiosk) dibuka lewat tombol "Lainnya". Sidebar
+// desktop (ruang vertikalnya cukup) tetap memuat semua menu apa adanya.
+const PRIMARY_MOBILE_HREFS = ["/dashboard", "/analytics", "/bmkg", "/kuota"];
 const primaryMobileItems = NAV_ITEMS.filter((item) => PRIMARY_MOBILE_HREFS.includes(item.href));
 const moreMobileItems = NAV_ITEMS.filter((item) => !PRIMARY_MOBILE_HREFS.includes(item.href));
 
@@ -87,6 +92,12 @@ export default function Nav() {
   }, [pathname]);
 
   const isMoreActive = moreMobileItems.some((item) => item.href === pathname);
+
+  // Mode Kiosk ("/") dimaksudkan layar-penuh tanpa navigasi (dipasang di
+  // TV/layar tanpa ada yang menjaga) -- sidebar/bottom-bar ini disembunyikan
+  // total di situ. KioskView.tsx punya tombol sendiri ("Lihat Dashboard")
+  // untuk kembali ke navigasi biasa.
+  if (pathname === "/") return null;
 
   return (
     <Fragment>
