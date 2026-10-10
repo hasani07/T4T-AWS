@@ -134,16 +134,15 @@ export default async function HomePage() {
     <PageShell>
       <header className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         {/* public/atmosx-logo.png -- logo + wordmark, menggantikan judul teks.
-            Dibungkus kotak putih (fixed, bukan bg-surface) karena warna
-            logonya tetap (navy/teal), supaya tetap kebaca jelas walau web
-            lagi mode gelap. */}
+            File PNG-nya SUDAH transparan (bukan kotak putih), jadi langsung
+            nyatu dengan background halaman tanpa kotak apapun di belakangnya. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/atmosx-logo.png"
           alt="AtmosX"
           width={932}
           height={722}
-          className="h-14 w-auto rounded-2xl bg-white p-1.5 sm:h-16"
+          className="h-14 w-auto sm:h-16"
         />
         <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center">
           {/* Mode ringkas yang geser otomatis -- cocok dipasang di layar/TV
