@@ -32,6 +32,10 @@ function parseSummaryRow(row: SummaryRow): RainfallSummary {
     device_id: toNumber(row.device_id),
     last_reading_at: String(row.last_reading_at ?? ""),
     rain_last_mm: toNumber(row.rain_last_mm),
+    rssi_last:
+      row.rssi_last === null || row.rssi_last === undefined
+        ? null
+        : toNumber(row.rssi_last),
     acc_1h: toNumber(row.acc_1h),
     acc_3h: toNumber(row.acc_3h),
     acc_6h: toNumber(row.acc_6h),
