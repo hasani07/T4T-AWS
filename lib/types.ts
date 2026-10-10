@@ -34,6 +34,9 @@ export type RainfallSummary = {
   device_id: number;
   last_reading_at: string; // timestamp sensor (angka jamnya sudah WIB, label +00)
   rain_last_mm: number; // hujan pada pengiriman terakhir (normalnya 1 menit)
+  // Kekuatan sinyal WiFi (dBm, negatif) pada pengiriman TERAKHIR. null untuk
+  // baris lama (sebelum firmware mengirim RSSI, lihat supabase/sql/015_rainfall_rssi.sql).
+  rssi_last: number | null;
   acc_1h: number;
   acc_3h: number;
   acc_6h: number;
