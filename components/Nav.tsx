@@ -104,8 +104,10 @@ export default function Nav() {
     <Fragment>
       {/* ---------- Sidebar desktop (md ke atas): semua menu, tanpa batasan ---------- */}
       <aside className="fixed inset-y-0 left-0 z-50 hidden w-20 flex-col items-center gap-2 border-r border-slate-200/60 bg-surface py-6 md:flex">
-        <div className="mb-8 flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-900 text-[11px] font-bold tracking-tight text-on-strong">
-          T4T
+        {/* public/t4t-logo.png -- logo (ikon "X"), latar transparan. */}
+        <div className="mb-8 flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-900">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/t4t-logo.png" alt="Logo" width={28} height={28} className="h-7 w-7 object-contain" />
         </div>
         <nav className="flex flex-1 flex-col items-center gap-1.5">
           {NAV_ITEMS.map((item) => {
