@@ -1,16 +1,20 @@
 import { TrendPoint } from "@/lib/kioskTrend";
 
 // SVG tangan (tanpa library chart) -- grafik ini cuma untuk "rasa arah
-// tren" di slide ringkasan kiosk, bukan pengganti grafik lengkap di
-// /analytics, jadi tidak perlu axis/tooltip/dsb.
+// tren" di papan kiosk, bukan pengganti grafik lengkap di /analytics,
+// jadi tidak perlu axis/tooltip/dsb. viewBox tetap pakai koordinat tetap
+// (gampang dihitung), tapi elemen <svg>-nya sendiri width="100%" height="100%"
+// + preserveAspectRatio="none" supaya garis/batangnya IKUT MEMBESAR mengisi
+// kotak pembungkusnya (kotak itu yang diberi tinggi lewat className di
+// KioskBoard.tsx) -- bukan selalu kecil 320x72 px seperti versi sebelumnya.
 const WIDTH = 320;
-const HEIGHT = 72;
+const HEIGHT = 110;
 const PAD_X = 4;
-const PAD_Y = 8;
+const PAD_Y = 10;
 
 function EmptyChart() {
   return (
-    <p className="text-xs text-slate-400">Belum cukup data untuk grafik tren.</p>
+    <p className="text-sm text-slate-400">Belum cukup data untuk grafik tren.</p>
   );
 }
 
@@ -47,21 +51,29 @@ export function MiniLineChart({ points, color }: { points: TrendPoint[]; color: 
   const last = known[known.length - 1];
 
   return (
-    <div className="flex flex-col items-center gap-1">
-      <svg width={WIDTH} height={HEIGHT} viewBox={`0 0 ${WIDTH} ${HEIGHT}`}>
-        {segments.map((d, i) => (
-          <path
-            key={i}
-            d={d}
-            fill="none"
-            stroke={color}
-            strokeWidth={2.5}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        ))}
-      </svg>
-      <p className="text-[11px] text-slate-400">
+    <div className="flex w-full flex-1 flex-col items-center justify-center gap-1.5">
+      <div className="h-28 w-full sm:h-36 lg:h-48">
+        <svg
+          width="100%"
+          height="100%"
+          viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+          preserveAspectRatio="none"
+        >
+          {segments.map((d, i) => (
+            <path
+              key={i}
+              d={d}
+              fill="none"
+              stroke={color}
+              strokeWidth={3}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              vectorEffect="non-scaling-stroke"
+            />
+          ))}
+        </svg>
+      </div>
+      <p className="text-sm text-slate-400 sm:text-base">
         {points[0]?.label}–{points[n - 1]?.label} WIB · terakhir {last.value.toFixed(1)}
       </p>
     </div>
@@ -83,28 +95,35 @@ export function MiniBarChart({ points, color }: { points: TrendPoint[]; color: s
   const barWidth = Math.max(2, innerW / n - barGap);
 
   return (
-    <div className="flex flex-col items-center gap-1">
-      <svg width={WIDTH} height={HEIGHT} viewBox={`0 0 ${WIDTH} ${HEIGHT}`}>
-        {points.map((p, i) => {
-          const v = p.value ?? 0;
-          const barH = v > 0 ? Math.max((v / max) * innerH, 2) : 1;
-          const x = PAD_X + i * (innerW / n);
-          const y = PAD_Y + innerH - barH;
-          return (
-            <rect
-              key={i}
-              x={x}
-              y={y}
-              width={barWidth}
-              height={barH}
-              rx={1.5}
-              fill={color}
-              opacity={v > 0 ? 1 : 0.2}
-            />
-          );
-        })}
-      </svg>
-      <p className="text-[11px] text-slate-400">
+    <div className="flex w-full flex-1 flex-col items-center justify-center gap-1.5">
+      <div className="h-28 w-full sm:h-36 lg:h-48">
+        <svg
+          width="100%"
+          height="100%"
+          viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+          preserveAspectRatio="none"
+        >
+          {points.map((p, i) => {
+            const v = p.value ?? 0;
+            const barH = v > 0 ? Math.max((v / max) * innerH, 2) : 1;
+            const x = PAD_X + i * (innerW / n);
+            const y = PAD_Y + innerH - barH;
+            return (
+              <rect
+                key={i}
+                x={x}
+                y={y}
+                width={barWidth}
+                height={barH}
+                rx={1.5}
+                fill={color}
+                opacity={v > 0 ? 1 : 0.2}
+              />
+            );
+          })}
+        </svg>
+      </div>
+      <p className="text-sm text-slate-400 sm:text-base">
         {points[0]?.label}–{points[n - 1]?.label} WIB
       </p>
     </div>
