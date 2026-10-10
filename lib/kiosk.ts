@@ -1,13 +1,15 @@
 // =====================================================================
-// Model data untuk Mode Kiosk (app/page.tsx + components/kiosk/*).
+// Model data untuk Mode Kiosk (app/kiosk/page.tsx + components/kiosk/*).
 //
 // Kiosk menyusun ULANG data yang sama dengan dashboard (devices + latest
-// sensor + ringkasan hujan) menjadi daftar "slide" yang digeser otomatis:
-// 1 slide ringkasan, 1 slide cuaca + 1 slide hujan PER device, lalu 1
-// slide peringatan di akhir (device offline, risiko waspada/kritis, sinyal
-// WiFi hujan lemah). Murni fungsi (tidak ada I/O) supaya gampang dipanggil
-// ulang tiap kali data di-polling, baik di server (SSR awal) maupun di
-// client (components/kiosk/KioskView.tsx).
+// sensor + ringkasan hujan) menjadi SATU struktur papan (board) yang
+// ditampilkan sekaligus di satu layar -- bukan slide yang digeser
+// otomatis. Tiap device digabung jadi satu kartu berisi cuaca + hujan +
+// risiko + sinyal WiFi sekaligus, supaya orang yang melihat sekilas dari
+// jauh langsung dapat semua info penting tanpa menunggu giliran slide.
+// Murni fungsi (tidak ada I/O) supaya gampang dipanggil ulang tiap kali
+// data di-polling, baik di server (SSR awal) maupun di client
+// (components/kiosk/KioskView.tsx).
 // =====================================================================
 
 import { DeviceRainfall, DeviceWithLatestReading } from "./types";
@@ -16,20 +18,16 @@ import { RAINFALL_OFFLINE_THRESHOLD_MINUTES, WIND_DIRECTION_LABELS } from "./con
 import { calcVPD, classifyVPD, classifyRisk, RiskLevel, VpdClass } from "./rules/ruleEngine";
 import { classifyRssi } from "./rssiClass";
 
-export interface KioskOverviewSlide {
-  kind: "overview";
-  devicesOnline: number;
-  devicesTotal: number;
-  avgTemp: number | null;
-  avgHumidity: number | null;
-  avgWind: number | null;
-  totalRain24h: number | null;
+export interface KioskIssue {
+  severity: "critical" | "warning";
+  message: string;
 }
 
-export interface KioskWeatherSlide {
-  kind: "weather";
+export interface KioskDeviceCard {
   deviceLabel: string;
-  online: boolean;
+
+  // ---- Cuaca (tabel sensors) ----
+  weatherOnline: boolean;
   temperature: number | null;
   humidity: number | null;
   windSpeed: number | null;
@@ -38,46 +36,41 @@ export interface KioskWeatherSlide {
   vpdClass: VpdClass | null;
   riskLevel: RiskLevel | null;
   riskExplanation: string | null;
-  lastReadingAt: string | null;
-}
+  weatherLastReadingAt: string | null;
 
-export interface KioskRainSlide {
-  kind: "rain";
-  deviceLabel: string;
-  online: boolean;
+  // ---- Hujan (tabel rainfall_readings) ----
+  rainOnline: boolean;
   todayMm: number | null;
   hour1Mm: number | null;
   rssi: number | null;
-  lastReadingAt: string | null;
-}
+  rainLastReadingAt: string | null;
 
-export interface KioskIssue {
-  severity: "critical" | "warning";
-  message: string;
-}
-
-export interface KioskAlertSlide {
-  kind: "alert";
+  // Isu khusus kartu ini (dipakai untuk badge kecil di kartu), subset dari
+  // issues global di bawah -- supaya tidak perlu nyari-cari sendiri di UI.
   issues: KioskIssue[];
 }
 
-export type KioskSlide =
-  | KioskOverviewSlide
-  | KioskWeatherSlide
-  | KioskRainSlide
-  | KioskAlertSlide;
+export interface KioskBoard {
+  devicesOnline: number;
+  devicesTotal: number;
+  avgTemp: number | null;
+  avgHumidity: number | null;
+  avgWind: number | null;
+  totalRain24h: number | null;
+  devices: KioskDeviceCard[];
+  // Semua isu dari semua device digabung satu daftar, urut device lalu
+  // jenis isu -- dipakai untuk pita peringatan di atas papan.
+  issues: KioskIssue[];
+}
 
 function findRainfall(rainfalls: DeviceRainfall[], deviceId: number): DeviceRainfall | undefined {
   return rainfalls.find((r) => r.deviceId === deviceId);
 }
 
-export function buildKioskSlides(
+export function buildKioskBoard(
   devices: DeviceWithLatestReading[],
   rainfalls: DeviceRainfall[]
-): KioskSlide[] {
-  const slides: KioskSlide[] = [];
-
-  // ---------- 1) Ringkasan ----------
+): KioskBoard {
   const weatherOnlineFlags = devices.map((d) =>
     d.latest ? isDeviceOnline(d.latest.created_at) : false
   );
@@ -113,25 +106,11 @@ export function buildKioskSlides(
     .map((r) => r.summary)
     .filter((r): r is NonNullable<typeof r> => r !== null);
   const totalRain24h =
-    rainSummaries.length > 0
-      ? rainSummaries.reduce((s, r) => s + r.acc_24h, 0)
-      : null;
+    rainSummaries.length > 0 ? rainSummaries.reduce((s, r) => s + r.acc_24h, 0) : null;
 
-  slides.push({
-    kind: "overview",
-    devicesOnline,
-    devicesTotal: devices.length,
-    avgTemp,
-    avgHumidity,
-    avgWind,
-    totalRain24h,
-  });
-
-  // ---------- 2) Cuaca + Hujan per device ----------
-  const issues: KioskIssue[] = [];
-
-  devices.forEach((d, i) => {
-    const online = weatherOnlineFlags[i];
+  const allIssues: KioskIssue[] = [];
+  const deviceCards: KioskDeviceCard[] = devices.map((d, i) => {
+    const weatherOnline = weatherOnlineFlags[i];
     const latest = d.latest;
     const vpd = latest ? calcVPD(latest.temperature, latest.humidity) : null;
     const vpdClass = vpd !== null ? classifyVPD(vpd) : null;
@@ -142,10 +121,41 @@ export function buildKioskSlides(
       ? WIND_DIRECTION_LABELS[latest.wind_direction] ?? latest.wind_direction
       : "-";
 
-    slides.push({
-      kind: "weather",
+    const rf = findRainfall(rainfalls, d.id);
+    const rainOnline = rainOnlineFlags[i];
+
+    const cardIssues: KioskIssue[] = [];
+    if (!weatherOnline) {
+      cardIssues.push({ severity: "warning", message: `${d.type}: weather station offline` });
+    }
+    if (risk?.level === "kritis") {
+      cardIssues.push({
+        severity: "critical",
+        message: `${d.type}: kondisi KRITIS — ${risk.explanation}`,
+      });
+    } else if (risk?.level === "waspada") {
+      cardIssues.push({
+        severity: "warning",
+        message: `${d.type}: perlu WASPADA — ${risk.explanation}`,
+      });
+    }
+    if (!rainOnline) {
+      cardIssues.push({ severity: "warning", message: `${d.type}: sensor hujan offline` });
+    }
+    if (rf?.summary?.rssi_last != null) {
+      const category = classifyRssi(rf.summary.rssi_last);
+      if (category.key === "weak") {
+        cardIssues.push({
+          severity: "warning",
+          message: `${d.type}: sinyal WiFi sensor hujan LEMAH (${rf.summary.rssi_last} dBm)`,
+        });
+      }
+    }
+    allIssues.push(...cardIssues);
+
+    return {
       deviceLabel: d.type,
-      online,
+      weatherOnline,
       temperature: latest?.temperature ?? null,
       humidity: latest?.humidity ?? null,
       windSpeed: latest?.wind_speed ?? null,
@@ -154,58 +164,24 @@ export function buildKioskSlides(
       vpdClass,
       riskLevel: risk?.level ?? null,
       riskExplanation: risk?.explanation ?? null,
-      lastReadingAt: latest?.created_at ?? null,
-    });
-
-    const rf = findRainfall(rainfalls, d.id);
-    const rainOnline = rainOnlineFlags[i];
-    slides.push({
-      kind: "rain",
-      deviceLabel: d.type,
-      online: rainOnline,
+      weatherLastReadingAt: latest?.created_at ?? null,
+      rainOnline,
       todayMm: rf?.summary?.acc_today ?? null,
       hour1Mm: rf?.summary?.acc_1h ?? null,
       rssi: rf?.summary?.rssi_last ?? null,
-      lastReadingAt: rf?.lastReadingAt ?? null,
-    });
-
-    // ---- Kumpulkan isu untuk slide peringatan ----
-    if (!online) {
-      issues.push({
-        severity: "warning",
-        message: `${d.type}: weather station offline`,
-      });
-    }
-    if (risk?.level === "kritis") {
-      issues.push({
-        severity: "critical",
-        message: `${d.type}: kondisi KRITIS — ${risk.explanation}`,
-      });
-    } else if (risk?.level === "waspada") {
-      issues.push({
-        severity: "warning",
-        message: `${d.type}: perlu WASPADA — ${risk.explanation}`,
-      });
-    }
-    if (!rainOnline) {
-      issues.push({
-        severity: "warning",
-        message: `${d.type}: sensor hujan offline`,
-      });
-    }
-    if (rf?.summary?.rssi_last != null) {
-      const category = classifyRssi(rf.summary.rssi_last);
-      if (category.key === "weak") {
-        issues.push({
-          severity: "warning",
-          message: `${d.type}: sinyal WiFi sensor hujan LEMAH (${rf.summary.rssi_last} dBm)`,
-        });
-      }
-    }
+      rainLastReadingAt: rf?.lastReadingAt ?? null,
+      issues: cardIssues,
+    };
   });
 
-  // ---------- 3) Peringatan / gangguan ----------
-  slides.push({ kind: "alert", issues });
-
-  return slides;
+  return {
+    devicesOnline,
+    devicesTotal: devices.length,
+    avgTemp,
+    avgHumidity,
+    avgWind,
+    totalRain24h,
+    devices: deviceCards,
+    issues: allIssues,
+  };
 }
