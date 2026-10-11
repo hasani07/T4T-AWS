@@ -1,657 +1,366 @@
-# AWS T4T — Dashboard Monitoring Mikroklimat (Fase 1 + Fase 2)
+<div align="center">
 
-Dashboard web untuk memonitor data sensor mikroklimat (suhu, kelembaban,
-kecepatan & arah angin, curah hujan) dari 2 device AWS (`CISANGKUY`,
-`CIMINYAK`), dibaca langsung dari Supabase.
+# 🌦️ AWS T4T — AtmosX
+### Dokumentasi Sistem Lengkap: Software, Hardware & Arsitektur
 
-**Referensi lengkap fitur & keputusan desain**: lihat file PRD
-(`PRD_Dashboard_Monitoring_AWS_T4T.md`) yang menyertai project ini.
+![Status](https://img.shields.io/badge/status-production-brightgreen) ![Lokasi](https://img.shields.io/badge/lokasi-2%20aktif-blue) ![Stack](https://img.shields.io/badge/stack-Next.js%20%2B%20Supabase-black)
 
-## Lingkup Fase 1 (Fondasi)
+*Disusun langsung dari kode yang berjalan di produksi — bukan dari rencana awal yang sudah usang.*
 
-✅ Koneksi ke Supabase (read-only)
-✅ Kartu dashboard per device: suhu, kelembaban, kecepatan angin, arah angin,
-   curah hujan
-✅ Status Online/Offline (threshold 90 menit, sesuai PRD)
-✅ Update kartu real-time (Supabase Realtime — otomatis refresh saat ada
-   data baru masuk, tanpa perlu reload halaman)
+</div>
 
-## Lingkup Fase 2 (Analitik & Perbandingan Periode) — halaman `/analytics`
+---
 
-✅ Pilih device (`CISANGKUY` / `CIMINYAK`)
-✅ Filter periode: 7 hari terakhir, 1 bulan terakhir (rolling 30 hari), atau
-   custom range (pilih tanggal dari–sampai)
-✅ Statistik per parameter: rata-rata, min, max (suhu, kelembaban, kecepatan
-   angin), serta total curah hujan pada periode tersebut
-✅ **Perbandingan otomatis** dengan periode sebelumnya yang durasinya sama
-   (ditampilkan sebagai delta persentase ▲/▼)
-✅ Arah angin dominan (dihitung sebagai modus/frekuensi kategori kompas,
-   mengecualikan kategori `"U"`/calm)
-✅ Grafik tren garis untuk suhu, kelembaban, dan kecepatan angin sepanjang
-   periode yang dipilih
-✅ **Perbandingan antar lokasi**: tabel yang membandingkan `CISANGKUY` vs
-   `CIMINYAK` untuk periode yang sama (bukan periode sebelumnya) — suhu,
-   kelembaban, kecepatan angin, curah hujan, dan arah angin dominan,
-   lengkap dengan kolom selisih
-✅ **Filter sanity-check otomatis**: baris data dengan nilai di luar rentang
-   wajar (lihat `lib/config.ts` → `SANITY_RANGES`) dikecualikan dari
-   perhitungan statistik, dengan notifikasi berapa baris yang dikecualikan.
-   Data mentahnya tetap ada di database, tidak dihapus/diubah.
+### 📑 Daftar Isi
 
-Belum termasuk (menyusul di fase berikutnya sesuai roadmap PRD): laporan
-mingguan Telegram, backup otomatis.
+1. [Ringkasan Satu Halaman](#1-️-ringkasan-satu-halaman)
+2. [Arsitektur Sistem](#2--arsitektur-sistem)
+3. [Hardware](#3--hardware)
+4. [Software](#4--software)
+5. [Deployment & Akun](#5--deployment--akun)
+6. [Riwayat Bug & Perbaikan](#6--riwayat-bug--perbaikan-war-stories)
+7. [Referensi Silang Dokumen](#7--referensi-silang-dokumen)
 
-## Lingkup Fase 4 (AI Recommendation) — halaman `/recommendations`
+> 💡 **Catatan penting:** beberapa angka di PRD/README lama (mis. ambang offline 90 menit, lokasi penyimpanan RSSI) sudah **berubah** di kode aktual. Dokumen ini mengikuti kode yang hidup sekarang, bukan rencana lama — perbedaannya ditandai jelas di setiap bagian yang relevan.
 
-✅ **Rule engine deterministik** (`lib/rules/ruleEngine.ts`) — hitung VPD,
-   klasifikasi risiko (aman/waspada/kritis) dari data sensor terbaru,
-   berbasis ambang batas materi Workshop T4T. Ini murni matematika/logika,
-   BUKAN dari LLM, supaya angka & klasifikasi konsisten.
-✅ **Groq** (`lib/groq.ts`) hanya menyusun narasi rekomendasi dari hasil
-   rule engine — tidak menghitung ulang angka.
-✅ **Generate manual**: tombol di halaman, langsung pakai data real-time
-   terbaru, hasil untuk 2 device sekaligus.
-✅ **Generate otomatis**: tiap pagi ±06:00 WIB lewat **Vercel Cron**
-   (`vercel.json`), pakai data 24 jam terakhir untuk konteks curah hujan.
-✅ Riwayat rekomendasi tersimpan di tabel baru `ai_recommendations` (lihat
-   `supabase/sql/001_create_ai_recommendations.sql`) — tabel ini **baru**,
-   tidak menyentuh `devices`/`sensors`/`system_logs`.
+---
 
-### ⚠️ Setup Tambahan yang WAJIB Sebelum Fase 4 Ini Jalan
+## 1. ☁️ Ringkasan Satu Halaman
 
-1. **Jalankan SQL migrasi**: buka Supabase Dashboard → SQL Editor, copy-paste
-   isi file `supabase/sql/001_create_ai_recommendations.sql`, jalankan.
-   Ini membuat tabel baru, tidak mengubah tabel yang sudah ada.
+**AWS T4T (AtmosX)** adalah sistem **monitoring mikroklimat pertanian real-time** yang menyatukan alat IoT di lapangan, database cloud, dashboard web, AI, dan notifikasi Telegram — dalam satu alur otomatis tanpa campur tangan manual.
 
-2. **Dapatkan Groq API key**: daftar/login di
-   [console.groq.com](https://console.groq.com), buat API key baru.
+```mermaid
+flowchart LR
+    subgraph Lapangan["📡 Alat di Lapangan (2 lokasi)"]
+        A["🌡️ Weather Station<br/>suhu · kelembaban · angin"]
+        B["🌧️ Rain Gauge ESP32-C3<br/>curah hujan · RSSI"]
+    end
 
-3. **Dapatkan Supabase service_role key**: Supabase Dashboard → Project
-   Settings → API → bagian "Project API keys" → copy key **`service_role`**
-   (BUKAN yang `anon`). Key ini sangat rahasia — bisa akses penuh ke semua
-   tabel, jangan pernah ditaruh di kode frontend atau di-commit ke Git.
+    subgraph Supabase["🗄️ Supabase"]
+        C["Postgres + Realtime<br/>+ Storage + pg_cron"]
+        D["⚡ Edge Functions<br/>(Deno)"]
+    end
 
-4. **Buat CRON_SECRET**: string acak bebas untuk mengamankan endpoint cron
-   (boleh generate dari [randomkeygen.com](https://randomkeygen.com) atau
-   sejenisnya).
+    E["🖥️ Dashboard Web<br/>Next.js di Vercel"]
+    F["🤖 Groq API<br/>narasi AI"]
+    G["📨 Telegram Bot<br/>laporan & alert"]
 
-5. **Tambahkan ke Environment Variables di Vercel** (Project Settings →
-   Environment Variables), selain 2 yang sudah ada sebelumnya:
-   - `GROQ_API_KEY`
-   - `GROQ_MODEL` (opsional, default `openai/gpt-oss-120b` — cek model
-     yang tersedia di console Groq kalau mau ganti)
-   - `SUPABASE_SERVICE_ROLE_KEY`
-   - `CRON_SECRET`
-
-   **PENTING**: jangan beri prefix `NEXT_PUBLIC_` pada 4 variable di atas —
-   itu akan membuatnya ter-expose ke browser.
-
-6. Redeploy project di Vercel setelah environment variables ditambahkan
-   (Vercel akan otomatis mendeteksi `vercel.json` dan mendaftarkan jadwal
-   cron-nya saat deploy).
-
-## Lingkup Fase 5 (Laporan Mingguan Telegram) — halaman `/reports`
-
-✅ Isi laporan: **teks ringkasan** (suhu, kelembaban, angin, curah hujan,
-   arah angin dominan, delta vs periode sebelumnya) + **grafik** (tren
-   suhu harian, dibuat via QuickChart.io) + **rekomendasi AI terakhir**
-   per device.
-✅ Dikirim ke **1 channel Telegram** (foto grafik dulu, lalu pesan teks
-   detail terpisah karena caption foto Telegram terbatas panjangnya).
-✅ **Generate manual**: tombol di halaman, langsung generate & kirim.
-✅ **Generate otomatis**: dicek setiap pagi (via Vercel Cron, 5 menit
-   setelah cron AI Recommendation), tapi baru benar-benar mengirim kalau
-   sudah lewat interval yang dikonfigurasi sejak laporan terakhir —
-   **interval bisa diatur dari dashboard** (disimpan di tabel `settings`,
-   default 7 hari) tanpa perlu ubah jadwal cron.
-✅ Riwayat laporan (`weekly_reports`) — tabel baru, tidak menyentuh yang
-   sudah ada.
-
-### ⚠️ Setup Tambahan untuk Fase 5
-
-1. **Jalankan SQL migrasi kedua**: `supabase/sql/002_create_weekly_reports.sql`
-   di Supabase SQL Editor (bikin tabel `settings` & `weekly_reports`).
-
-2. **Buat Bot Telegram**:
-   - Chat ke [@BotFather](https://t.me/BotFather) di Telegram
-   - Kirim `/newbot`, ikuti instruksinya (kasih nama & username bot)
-   - Simpan **token** yang diberikan (formatnya seperti
-     `123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ`)
-
-3. **Buat/siapkan channel Telegram**, lalu **tambahkan bot tadi sebagai
-   admin** channel itu (Settings channel → Administrators → Add Admin →
-   cari username bot Anda).
-
-4. **Dapatkan Chat ID channel**:
-   - Kirim 1 pesan apa saja ke channel-nya dulu
-   - Buka di browser:
-     `https://api.telegram.org/bot<TOKEN_BOT_ANDA>/getUpdates`
-     (ganti `<TOKEN_BOT_ANDA>` dengan token dari langkah 2)
-   - Cari bagian `"chat":{"id":-100xxxxxxxxxx, ...}` di hasil JSON-nya —
-     angka itu (termasuk tanda minusnya) adalah Chat ID Anda
-
-5. **Tambahkan ke Environment Variables Vercel**:
-   - `TELEGRAM_BOT_TOKEN`
-   - `TELEGRAM_CHAT_ID`
-
-6. Redeploy, lalu coba klik "Generate & Kirim Sekarang" di halaman
-   `/reports` — cek apakah pesannya muncul di channel Telegram Anda.
-
-## Lingkup Fase 3 (Download Data Sensor) — halaman `/download`
-
-✅ Pilih device (`CISANGKUY` / `CIMINYAK` / "Semua Device" gabungan)
-✅ Filter periode: 7 hari terakhir, 1 bulan terakhir, atau custom range
-✅ Export ke **CSV** dengan kolom: `created_at, device_id, device_type,
-   temperature, humidity, wind_speed, wind_direction, rainfall`
-✅ **Pagination otomatis** — kalau data pada rentang tanggal lebih dari 1000
-   baris (batas default per-query Supabase), sistem otomatis mengambil
-   semua halaman data supaya tidak ada yang terpotong diam-diam
-✅ File CSV berisi data **mentah apa adanya** (tidak difilter sanity-check
-   seperti di halaman Analitik) — cocok untuk audit/investigasi
-
-## Fitur Tambahan (di luar PRD awal): Laporan Excel dengan Grafik
-
-Ditambahkan berdasarkan masukan pengguna — halaman `/download` sekarang
-juga punya **Export ke Excel** yang menghasilkan file `.xlsx` berisi:
-- Tabel ringkasan (min/max/rata-rata suhu & kelembaban, rata-rata
-  kecepatan angin, total curah hujan) per periode
-- **Grafik tren suhu tertanam langsung di dalam file Excel-nya** (bukan
-  cuma link/gambar terpisah)
-
-3 pilihan granularitas:
-- **Harian (per Jam)** — pilih 1 tanggal, breakdown per jam
-- **Mingguan (per Hari)** — 7 hari terakhir, breakdown per hari
-- **Bulanan (per Hari)** — 30 hari terakhir, breakdown per hari
-
-Dibangun pakai library `exceljs` (server-side, di API route
-`/api/reports/export-excel`) dan QuickChart.io untuk render gambar
-grafiknya (sama seperti yang dipakai di Laporan Mingguan Telegram).
-
-## Fitur Tambahan: Generate Laporan Lewat Command Chat Telegram
-
-Selain generate dari dashboard, sekarang bisa juga minta laporan langsung
-dari Telegram dengan mengetik command:
-- `/laporan` — 7 hari terakhir (default)
-- `/laporan minggu` — 7 hari terakhir
-- `/laporan bulan` — 30 hari terakhir
-- `/laporan 14` — 14 hari terakhir (bisa ganti angka lain)
-- `/laporan 2026-09-01 2026-09-19` — custom range tanggal (format YYYY-MM-DD)
-
-Balasannya dikirim ke **chat yang sama** tempat command diketik (channel,
-grup, atau chat pribadi ke bot).
-
-**⚠️ Batasan Telegram (bukan dari kode ini)**: kalau dipakai di
-**Channel** (bukan Grup), **hanya admin channel** yang bisa mengirim
-pesan/command sama sekali — itu memang cara kerja Channel di Telegram.
-Subscriber biasa tidak akan punya kotak ketik. Kalau mau semua orang bisa
-pakai command ini bebas, gunakan **Grup** Telegram, bukan Channel (laporan
-otomatis terjadwal tetap bisa dikirim ke Channel seperti biasa).
-
-### Setup Tambahan
-
-1. **Jalankan migrasi**: `supabase/sql/006_allow_chat_trigger.sql` (izinkan
-   nilai `trigger_type = 'chat'` di tabel `weekly_reports`, tabel milik
-   kita sendiri jadi aman diubah).
-
-2. **Buat `TELEGRAM_WEBHOOK_SECRET`**: string acak bebas, mis. dari
-   `openssl rand -hex 24`.
-
-3. **Deploy Edge Function `telegram-webhook`**: Supabase Dashboard → Edge
-   Functions → Deploy a new function → Via Editor → nama persis
-   `telegram-webhook` → paste isi
-   `supabase/functions/telegram-webhook/index.ts` → Deploy.
-
-4. **PENTING — matikan verifikasi JWT untuk function ini**: cari
-   pengaturan function `telegram-webhook` (biasanya toggle "Enforce JWT
-   Verification" / "Verify JWT" di halaman detail function), **matikan**.
-   Telegram tidak bisa mengirim token autentikasi Supabase kita, jadi kalau
-   verifikasi JWT masih aktif, semua request dari Telegram akan ditolak
-   duluan sebelum sampai ke kode kita. Keamanannya digantikan oleh
-   pengecekan `TELEGRAM_WEBHOOK_SECRET` di dalam kode function-nya sendiri.
-
-5. **Tambahkan secret** `TELEGRAM_WEBHOOK_SECRET` di Edge Function
-   Secrets (selain `TELEGRAM_BOT_TOKEN` yang sudah ada dari Fase 5).
-
-6. **Daftarkan webhook ke Telegram** — buka URL ini di browser (ganti
-   placeholder-nya):
-   ```
-   https://api.telegram.org/bot<TOKEN_BOT_ANDA>/setWebhook?url=https://<PROJECT_REF>.supabase.co/functions/v1/telegram-webhook&secret_token=<TELEGRAM_WEBHOOK_SECRET>
-   ```
-   Harus muncul respons `{"ok":true,"result":true,"description":"Webhook was set"}`.
-
-7. **Tes**: ketik `/laporan` di channel (kalau Anda admin) atau chat
-   pribadi ke bot. Tunggu beberapa detik, harusnya muncul balasan grafik +
-   teks laporan + **file Excel** (ringkasan harian per device, 1 sheet per
-   device).
-
-### Fitur Tombol (Klik, Tidak Perlu Ngetik)
-
-Ketik `/start` atau `/menu` sekali (boleh siapa saja di channel, tidak
-harus admin) — bot akan balas dengan **3 tombol**: "📅 Hari Ini",
-"📆 Minggu Ini", "🗓️ Bulan Ini". Tinggal klik salah satu, laporan langsung
-digenerate tanpa perlu ketik command sama sekali.
-
-**Kenapa tombol ini bisa dipakai semua orang, sedangkan command teks
-cuma admin?** Karena klik tombol (Inline Keyboard) itu jenis interaksi
-Telegram yang berbeda dari mengirim pesan — namanya "callback query",
-dan itu tidak kena batasan "cuma admin yang bisa kirim pesan di channel".
-
-**Opsional**: supaya command `/laporan` juga muncul di menu "/" bawaan
-Telegram (autocomplete saat mulai ngetik "/"), jalankan sekali di browser
-(ganti TOKEN-nya):
-```
-https://api.telegram.org/bot<TOKEN>/setMyCommands?commands=[{"command":"menu","description":"Tampilkan tombol pilihan laporan"},{"command":"laporan","description":"Generate laporan (contoh: /laporan minggu)"}]
+    A -- HTTPS --> C
+    B -- HTTPS --> C
+    C <-- realtime --> E
+    C --> D
+    D --> F
+    D --> G
+    E -. generate manual .-> D
 ```
 
-### Catatan: File Excel di Telegram Pakai Library Berbeda
+**3 prinsip utama yang membentuk seluruh sistem:**
 
-Karena Edge Function jalan di Deno (bukan Node.js seperti Next.js/Vercel),
-library `exceljs` yang dipakai di `lib/excelReport.ts` **tidak dipakai** di
-sini — sebagai gantinya dipakai `xlsx` (SheetJS) yang lebih ringan dan
-terbukti kompatibel dengan Deno. Fungsinya sama (bikin file Excel), tapi
-Excel dari Telegram ini **berisi ringkasan harian saja** (tanpa grafik
-tertanam di dalam file-nya, karena grafiknya sudah dikirim terpisah
-sebagai foto) — beda dengan Excel dari halaman `/download` yang grafiknya
-memang ditempel langsung di dalam file.
+| 🔒 Read-only & non-destructive | 🔀 2 alat, 2 status per lokasi | ⏱️ Kuirk waktu WIB |
+|---|---|---|
+| Dashboard & fitur baru **tidak pernah** mengubah skema tabel lama (`devices`, `sensors`) atau mengganggu firmware produksi. Semua tambahan bersifat aditif. | Weather station (→ `sensors`) dan rain gauge (→ `rainfall_readings`) adalah **dua ESP32 fisik berbeda** dengan status online/offline masing-masing. | `created_at` berlabel UTC tapi angkanya **sudah WIB** — sengaja dibiarkan di sumbernya, dikompensasi di kode web. |
 
-## ⚠️ PENTING — Prinsip Keamanan Data
+---
 
-Project ini **hanya membaca (SELECT)** data dari tabel `devices` dan
-`sensors` yang sudah berjalan. **Tidak ada satupun kode di sini yang
-menulis (insert/update/delete)** ke tabel tersebut. Pipeline device →
-Supabase yang sudah ada **tidak disentuh sama sekali** oleh project ini.
+## 2. 🏗️ Arsitektur Sistem
 
-Gunakan **anon/public key** Supabase (bukan `service_role` key) di
-`.env.local` — anon key ini cukup untuk operasi baca dan lebih aman
-dipakai di sisi browser.
+### 2.1 Komponen Utama
 
-Jangan mengubah Row Level Security (RLS) di Supabase sebagai bagian dari
-setup fase ini. Kalau nanti perlu mengaktifkan/mengubah RLS untuk alasan
-keamanan, itu didiskusikan terpisah supaya tidak berisiko mengganggu jalur
-tulis data dari device.
+| # | Komponen | Peran |
+|---|---|---|
+| 1️⃣ | **ESP32 Weather Station** (per lokasi) | Baca suhu, kelembaban, kecepatan & arah angin → tabel `sensors` |
+| 2️⃣ | **ESP32-C3 Rain Gauge** (per lokasi) | Baca curah hujan tipping-bucket (I2C) + RSSI WiFi → tabel `rainfall_readings` |
+| 3️⃣ | **Supabase Postgres** | Database utama + RLS + Realtime (WAL change feed) + Storage (chart cache, firmware `.bin`) |
+| 4️⃣ | **Supabase Edge Functions** (Deno) | Logic server-side terjadwal: laporan mingguan, rekomendasi AI, alert real-time, backup monitor, webhook Telegram |
+| 5️⃣ | **pg_cron** | Memicu Edge Function sesuai jadwal lewat HTTP call (`pg_net`) |
+| 6️⃣ | **Next.js Dashboard** (Vercel) | UI web: realtime card, analitik, kiosk mode, download data, admin OTA |
+| 7️⃣ | **Groq API** | Menulis **narasi** rekomendasi dari angka yang sudah dihitung rule engine — tidak pernah menghitung sendiri |
+| 8️⃣ | **Telegram Bot API** | Push laporan mingguan, alert kritis, dan command chat (`/laporan`) |
 
-## Setup Lokal
+### 2.2 Alur Data — Langkah demi Langkah
 
-1. Install dependencies:
-   ```bash
-   npm install
-   ```
+```
+①  ESP32 lapangan ──HTTPS──► Supabase REST (insert langsung, anon key + RLS)
+②  Dashboard ◄──Realtime (postgres_changes)── Supabase  (update tanpa reload)
+③  Supabase SQL view/function menghitung agregasi berat (akumulasi hujan, uptime, kuota)
+④  pg_cron ──HTTP (pg_net)──► Edge Function  (terjadwal: laporan, AI, snapshot BMKG, dll.)
+⑤  Edge Function `generate-recommendation` → rule engine (VPD + risiko) → Groq (narasi saja)
+⑥  Hasil → Telegram Bot API (parse_mode HTML, semua teks dinamis di-escape dulu)
+⑦  `telegram-webhook` menerima command masuk (mis. /laporan) → balas on-demand
+⑧  Admin upload firmware .bin → Supabase Storage → ESP32 cek versi tiap 2 menit → OTA
+```
 
-2. Salin `.env.example` menjadi `.env.local`, lalu isi dengan kredensial
-   Supabase Anda:
-   ```bash
-   cp .env.example .env.local
-   ```
-   Isi `NEXT_PUBLIC_SUPABASE_URL` dan `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-   (bisa dilihat di Supabase Dashboard → Project Settings → API).
+### 2.3 Prinsip Desain
 
-3. Jalankan dev server:
-   ```bash
-   npm run dev
-   ```
-   Buka [http://localhost:3000](http://localhost:3000) — seharusnya
-   langsung tampil kartu untuk device `CISANGKUY` dan `CIMINYAK` dengan
-   data terbaru dari Supabase.
+- 🔐 **Read-only terhadap data lama** — tidak ada INSERT/UPDATE/DELETE dashboard ke `devices`/`sensors`.
+- 🧩 **Tanpa foreign key ke tabel lama** — `rainfall_readings.device_id` sengaja lepas dari constraint, supaya skema lama tak perlu disentuh.
+- ⚙️ **Agregasi berat di database**, bukan di client — hemat bandwidth, konsisten, skalabel.
+- 🛡️ **Gagal dengan lembut** — contoh: kalau view hujan belum ada, dashboard tetap tampil "belum ada data" alih-alih crash.
 
-## Deploy ke GitHub + Vercel
+---
 
-1. Buat repo baru di GitHub bernama **AWS T4T** (atau nama lain sesuai
-   preferensi Anda), lalu push project ini ke sana:
-   ```bash
-   git init
-   git add .
-   git commit -m "Fase 1: fondasi dashboard + koneksi Supabase read-only"
-   git branch -M main
-   git remote add origin <url-repo-github-anda>
-   git push -u origin main
-   ```
-   *(`.env.local` tidak akan ikut ter-push karena sudah ada di `.gitignore`
-   — kredensial Anda aman.)*
+## 3. 🔧 Hardware
 
-2. Buka [vercel.com](https://vercel.com), login/daftar, lalu klik
-   **"Add New Project"** → import repo GitHub **AWS T4T** yang baru dibuat.
+### 3.1 Dua Alat per Lokasi
 
-3. Di halaman konfigurasi project Vercel, buka bagian **Environment
-   Variables**, tambahkan:
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+Tiap lokasi (**Cisangkuy** & **Ciminyak**) punya dua ESP32 fisik yang berdiri sendiri:
 
-   (nilainya sama seperti di `.env.local` Anda)
+<table>
+<tr><td width="50%" valign="top">
 
-4. Klik **Deploy**. Setelah selesai, Vercel akan kasih URL live (misal
-   `aws-t4t.vercel.app`) yang bisa langsung diakses.
+#### 🌡️ A. Weather Station
+- Mengukur suhu (°C), kelembaban (%), kecepatan angin (m/s), arah angin (kompas 8 arah / *calm*)
+- Upload ke tabel `sensors`
+- **Kini kirim tiap 1 menit** (bukan 1 jam seperti asumsi PRD awal — lihat `lib/config.ts`)
 
-## Troubleshooting Cepat
+</td><td width="50%" valign="top">
 
-- **Kartu kosong / "Tidak ada device ditemukan"**: cek environment
-  variable sudah benar, dan cek juga apakah RLS di tabel `devices`/
-  `sensors` mengizinkan role `anon` untuk SELECT (kalau RLS belum aktif
-  sama sekali di tabel tersebut, seharusnya tidak masalah — anon key
-  otomatis bisa baca).
-- **Error saat build terkait environment variable**: pastikan sudah
-  set `NEXT_PUBLIC_SUPABASE_URL` dan `NEXT_PUBLIC_SUPABASE_ANON_KEY` baik
-  di `.env.local` (lokal) maupun di Environment Variables Vercel (saat
-  deploy).
+#### 🌧️ B. Rain Gauge — ESP32-C3 "SuperMini"
+- Sensor **DFRobot SEN0575** (tipping-bucket, mode **I2C**)
+- 1 guling mangkuk = **0,2794 mm** hujan (`MM_PER_TIP`, bisa dikalibrasi)
+- Upload ke tabel `rainfall_readings`, tiap 1 menit + RSSI
 
-## Roadmap Fase Berikutnya
+</td></tr>
+</table>
 
-Semua 6 fase dari PRD sudah selesai diimplementasikan. 🎉
+### 3.2 Spesifikasi Teknis Rain Gauge (Detail)
 
-## Lingkup Fase 6 (Backup Otomatis & Notifikasi) — halaman `/backups`
+| Aspek | Detail |
+|---|---|
+| **Board** | ESP32-C3 "SuperMini" — kecil, murah, WiFi built-in |
+| **Sensor** | DFRobot SEN0575, via I2C (`DFRobot_RainfallSensor_I2C`) |
+| **Pin I2C** | SDA = GPIO 1 · SCL = GPIO 0 |
+| **Prinsip baca** | Sensor melaporkan **counter kumulatif** (bukan nilai sesaat) → firmware hitung delta tiap siklus. Sampling lebih lambat ≠ kehilangan presisi. |
+| **Siklus sampling** | 10 detik × 6 kali = 1 menit per upload (hemat I2C/Serial 5× dibanding versi lama) |
+| **WiFi TX power** | ⚠️ **Semua board di kedua lokasi gagal connect di daya tinggi** (terdeteksi tapi tak pernah berhasil `WiFi.begin()`). Firmware langsung pakai daya rendah (`WIFI_POWER_8_5dBm`), tanpa percobaan daya tinggi sama sekali. |
+| **Retry & self-healing** | Retry WiFi tiap 60 detik · restart otomatis jika WiFi putus >10 menit |
+| **Watchdog** | Hardware WDT 60 detik + restart otomatis jika free heap <50KB atau blok memori terbesar <45KB |
+| **OTA** | Cek firmware baru tiap 2 menit dari Supabase Storage, auto-download & flash |
+| **Serial jarak jauh** | Saat diaktifkan dari dashboard, log dikirim ke tabel `device_console` tiap 3 detik (auto-mati sesuai batas waktu) |
+| **Timezone** | GMT+7 (WIB) hardcoded, sinkron NTP setelah WiFi tersambung |
 
-✅ **Backup otomatis**: dicek tiap 15 menit (Supabase Edge Function +
-   pg_cron), trigger saat kapasitas database >= 50% dari kuota yang
-   dikonfigurasi.
-✅ Backup berupa **export data seluruh tabel ke JSON** (bukan pg_dump
-   fisik — Edge Function tidak bisa jalankan pg_dump), disimpan di
-   Supabase Storage bucket `backups` (private).
-✅ **Retensi 60 hari** — otomatis dihapus dari Storage kalau lewat batas
-   itu dan belum pernah didownload.
-✅ **Notifikasi Telegram bertingkat**:
-   - Normal: 1x/24 jam
-   - H-1 (sisa ≤24 jam sebelum terhapus): tiap 30 menit
-   - Berhenti total begitu backup didownload lewat dashboard
-✅ Halaman `/backups`: lihat kapasitas real-time, atur kuota (MB), daftar
-   backup dengan tombol download (generate signed URL + tandai
-   `downloaded` otomatis saat diklik).
+**Payload upload** (tiap 1 menit, langsung ke Supabase REST):
+```json
+{"device_id": 2, "rain_mm": 0.0000, "rainfall": 0.00, "rssi": -67}
+```
+| Field | Arti |
+|---|---|
+| `rain_mm` | Hujan (mm) sejak upload sukses sebelumnya — dasar akumulasi rolling 1/3/6/12/24 jam |
+| `rainfall` | Akumulasi hujan **hari ini**, reset otomatis 00:00 WIB |
+| `rssi` | Kekuatan sinyal WiFi (dBm) saat upload — ditambahkan di firmware v13 |
 
-### ⚠️ Setup Tambahan untuk Fase 6
+> Kedua firmware (`Firmware Rainfall Cisangkuy.ino` / `...Ciminyak.ino`) identik kecuali `DEVICE_ID` dan kredensial WiFi lokasi masing-masing.
 
-1. **Jalankan SQL migrasi**: `supabase/sql/004_create_backup_system.sql`
-   di Supabase SQL Editor. Ini membuat tabel `backup_logs`, function
-   `get_database_size_mb()`, dan default kuota 500 MB di `settings`.
+### 3.3 Lokasi Fisik
 
-2. **Buat Storage bucket manual**: Supabase Dashboard → Storage → **New
-   bucket** → nama **`backups`** → **Private** (jangan dicentang Public).
+| 📍 Lokasi | Koordinat | `device_id` |
+|---|---|---|
+| **Cisangkuy** (Cirasea) | -7.049497, 107.561626 | 1 |
+| **Ciminyak** | -6.919351, 107.370483 | 2 |
 
-3. **Sesuaikan kuota database**: buka halaman `/backups` di dashboard
-   Anda, cek plan Supabase yang sedang dipakai (Dashboard → Settings →
-   Usage → lihat batas "Database size"), lalu update angka kuota (MB) di
-   halaman itu kalau beda dari default 500 MB.
+### 3.4 Catatan Historis
 
-4. **Deploy Edge Function `backup-monitor`**: Supabase Dashboard → Edge
-   Functions → Deploy a new function → Via Editor → nama persis
-   `backup-monitor` → paste isi `supabase/functions/backup-monitor/index.ts`
-   → Deploy. **Tidak perlu secrets baru** — `TELEGRAM_BOT_TOKEN` dan
-   `TELEGRAM_CHAT_ID` dari Fase 5 dipakai lagi di sini.
+Kolom `sensors.rainfall` adalah **peninggalan** desain lama (rencana awal: hujan ikut dikirim dari weather station). Sekarang selalu kosong/0 dan **tidak dipakai** — dibiarkan ada agar firmware weather station lama tidak terganggu. Data hujan resmi 100% dari `rainfall_readings`.
 
-5. **Jadwalkan lewat pg_cron**: buka `supabase/sql/005_setup_backup_cron.sql`,
-   ganti `<PROJECT_REF>` dan `<SERVICE_ROLE_KEY>`, jalankan di SQL Editor.
+---
 
-6. Verifikasi: `select * from cron.job;` harus menampilkan 3 jadwal
-   sekarang (generate-recommendation, weekly-report, backup-monitor).
+## 4. 💻 Software
 
-### Catatan Jujur soal Keterbatasan
+### 4.1 Tech Stack
 
-- Backup ini **export data**, bukan backup database fisik lengkap
-  (schema, index, RLS policy tidak ikut ter-backup — itu bisa direplikasi
-  ulang dari file SQL migrasi di `supabase/sql/` kalau perlu restore total).
-- Kuota database **tidak otomatis terdeteksi** dari plan Supabase Anda —
-  harus diisi manual dan disesuaikan sendiri kalau upgrade/downgrade plan.
+| Layer | Teknologi |
+|---|---|
+| Framework | **Next.js 14.2.15** (App Router) |
+| Bahasa | **TypeScript 5.5.3** |
+| UI | **React 18.3.1** + **Tailwind CSS 3.4.4** |
+| Grafik | `recharts` 2.12.7 |
+| Peta | `leaflet` 1.9.4 |
+| Ikon | `lucide-react` |
+| Export Excel | `exceljs` 4.4.0 |
+| Backend | **Supabase** (Postgres, Realtime, Storage, Edge Functions/Deno, pg_cron) |
+| AI | **Groq API** (narasi, bukan kalkulasi) |
+| Notifikasi | **Telegram Bot API** |
+| Hosting | **Vercel** |
 
-## Catatan Arsitektur: Scheduler
+### 4.2 Peta Halaman (Routes)
 
-**Update**: Semua cron job (AI Recommendation & Laporan Mingguan) sudah
-**dipindahkan ke Supabase Edge Functions + pg_cron**, bukan lagi Vercel
-Cron. Lihat bagian "Migrasi Scheduler ke Supabase" di bawah.
+| Route | Fungsi |
+|---|---|
+| `/` | 🏠 Dashboard utama — kartu realtime, status online/offline, uptime, peta |
+| `/kiosk` | 📺 Mode kiosk satu-layar-penuh untuk TV/monitor tanpa penjaga |
+| `/analytics` | 📈 Tren historis suhu/kelembaban/angin/hujan |
+| `/recommendations` | 🤖 Rekomendasi AI (VPD, risiko, narasi Groq) |
+| `/reports` | 📨 Riwayat & generate manual laporan mingguan Telegram |
+| `/download` | ⬇️ Unduh data CSV / Excel |
+| `/bmkg` | 🛰️ Perbandingan dengan data resmi BMKG |
+| `/kuota` | 📊 Monitoring kuota pemakaian |
+| `/backups` | 💾 Status backup otomatis |
+| `/rainfall-monitor` | 🌧️ Monitor detail sensor hujan |
+| `/admin/firmware` | 🛠️ Upload firmware `.bin` untuk OTA |
 
-Endpoint `/api/cron/generate-recommendation` dan `/api/cron/weekly-report`
-di Next.js **masih ada** di kode (tidak dihapus, tidak berbahaya kalau
-dibiarkan — dilindungi `CRON_SECRET`), tapi **tidak lagi dipanggil
-otomatis** karena `vercel.json` sudah tidak punya konfigurasi cron.
-Tombol **manual** ("Generate Rekomendasi Sekarang", "Generate & Kirim
-Sekarang") tetap jalan seperti biasa lewat Next.js/Vercel — yang pindah
-cuma bagian **terjadwal/otomatisnya**.
+### 4.3 Edge Functions (Deno)
 
-## Migrasi Scheduler ke Supabase Edge Functions + pg_cron
+| Function | Peran | Trigger |
+|---|---|---|
+| `weekly-report` | Generate + kirim laporan mingguan (chart + statistik + rekomendasi AI) | pg_cron |
+| `generate-recommendation` | Rule engine → Groq → simpan ke `ai_recommendations` | pg_cron |
+| `realtime-alert-check` | Cek kondisi kritis, kirim alert instan | Database Webhook (event-driven) |
+| `backup-monitor` | Cek status backup → `backup_logs` | pg_cron |
+| `telegram-webhook` | Balas command Telegram (`/laporan`, dll.) | Webhook HTTP |
 
-### Kenapa Pindah
-- Presisi jadwal lebih baik (tidak "kira-kira dalam 1 jam" seperti Vercel
-  Hobby)
-- Tidak dibatasi 1x/hari kalau nanti butuh frekuensi lebih tinggi
-- Konsisten dengan Fase 6 (Backup & Notifikasi) yang memang harus pakai
-  infrastruktur ini
+> ⚠️ **Jebakan duplikasi:** logic laporan mingguan ada di **dua tempat** yang harus tetap sinkron — `supabase/functions/weekly-report/index.ts` (Deno, otomatis) dan `lib/weeklyReport.ts` (Next.js, tombol manual). Keduanya **wajib** pakai `escapeHtml()` sebelum menyisipkan teks AI ke pesan Telegram HTML.
+>
+> ⚠️ **Deno ≠ Node** — Edge Function tidak bisa `import { supabase } from "./supabase"` (gaya Next.js); harus pakai URL eksplisit `https://esm.sh/...`. Jangan salah tempel `lib/weeklyReport.ts` ke editor Edge Function Supabase.
 
-### File yang Terlibat
-- `supabase/functions/generate-recommendation/index.ts` — versi Deno dari
-  logic AI Recommendation
-- `supabase/functions/weekly-report/index.ts` — versi Deno dari logic
-  Laporan Mingguan
-- `supabase/sql/003_setup_pg_cron.sql` — SQL untuk menjadwalkan keduanya
+### 4.4 Rule Engine — Otak Deterministik di Balik AI
 
-### Langkah Deploy (Semua Lewat Browser, TIDAK Perlu Install CLI/Docker)
+📍 `lib/rules/ruleEngine.ts` — **semua angka pertanian dihitung dengan rumus/ambang tetap di kode** sebelum diserahkan ke Groq untuk dinarasikan. Groq **tidak pernah** menghitung ulang angka sendiri.
 
-1. **Buka Supabase Dashboard → Edge Functions** (menu di sidebar kiri).
-2. Klik **"Deploy a new function"** → pilih **"Via Editor"**.
-3. Beri nama function: **`generate-recommendation`** (harus persis ini).
-4. Hapus kode template bawaan, **paste seluruh isi**
-   `supabase/functions/generate-recommendation/index.ts` dari project ini.
-5. Klik **Deploy**.
-6. Ulangi langkah 2-5 untuk function kedua, nama: **`weekly-report`**,
-   isinya dari `supabase/functions/weekly-report/index.ts`.
+| Metrik | Rumus / Ambang |
+|---|---|
+| **VPD** (Vapor Pressure Deficit) | Rumus Magnus dari suhu & kelembaban → rendah (<0,8 kPa) / sedang (0,8–1,5) / tinggi (>1,5) |
+| **Level risiko** | 🔴 Kritis: suhu >33°C **dan** kelembaban <55% · 🟡 Waspada: suhu >32°C **atau** kelembaban <60% · angin kuat (>8 m/s) + suhu >30°C menaikkan level satu tingkat |
 
-### Set Secrets untuk Edge Functions
+### 4.5 Skema Database Aktual
 
-Masuk ke **Project Settings → Edge Functions → Secrets** (atau menu
-serupa tergantung versi dashboard), tambahkan:
-- `GROQ_API_KEY`
-- `GROQ_MODEL` (opsional, default `openai/gpt-oss-120b`)
-- `TELEGRAM_BOT_TOKEN`
-- `TELEGRAM_CHAT_ID`
+**Tabel lama** (read-only, skema tidak pernah disentuh):
+```
+devices       (id, type)                     -- nama lokasi
+sensors       (id, device_id, temperature, humidity, wind_speed,
+               wind_direction, rainfall [DEPRECATED], created_at)
+system_logs   (log lama)
+```
 
-*(`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` OTOMATIS
-tersedia di semua Edge Function — tidak perlu diisi manual.)*
-
-### Jadwalkan dengan pg_cron
-
-1. Buka **Supabase SQL Editor**.
-2. Buka file `supabase/sql/003_setup_pg_cron.sql`, **ganti**
-   `<PROJECT_REF>` dan `<SERVICE_ROLE_KEY>` dengan punya Anda (project
-   ref terlihat di URL dashboard atau Project Settings → General).
-3. Jalankan SQL-nya.
-4. Cek jadwal aktif: `select * from cron.job;`
-
-### Tes Manual (Sebelum Menunggu Jadwal)
-
-Bisa test langsung dari SQL Editor atau browser dengan memanggil URL
-function-nya pakai service_role key sebagai Bearer token (pakai tool
-seperti Postman, atau `curl` kalau familiar terminal) — atau paling
-gampang, tunggu jadwalnya jalan besok pagi, lalu cek:
+**Tabel/view baru** (aditif, tanpa FK ke tabel lama):
 ```sql
-select * from cron.job_run_details order by start_time desc limit 10;
+rainfall_readings   (id, device_id, rain_mm, rainfall, rssi, created_at)
+ ├─ view  rainfall_summary   → last_reading_at, rain_last_mm, rssi_last,
+ │                              acc_1h/3h/6h/12h/24h, acc_today
+ ├─ view  rainfall_hourly / rainfall_daily   → agregasi grafik
+ └─ fn    rainfall_total() / rainfall_buckets()
+
+ai_recommendations  (device_id, recommendation_text, generated_at, ...)
+weekly_reports      (trigger_type, period_start/end, interval_days_config,
+                      telegram_message_id, status, summary_text, error_message)
+backup_logs
+settings            (key-value config, mis. weekly_report_interval_days)
+
+fn device_uptime(kind, device_id, start, end, threshold_minutes)
+   → window_seconds, down_seconds, outage_count, longest_outage_seconds, recent_outages
+
+device_quota / quota_cron            → kuota pemakaian
+bmkg_adm4_defaults / bmkg_snapshots / bmkg_releases  → pembanding BMKG
 ```
 
-## ⚠️ Catatan Penting: Bug Timestamp di Sumber Data
+Semua tabel baru: RLS `anon` boleh `insert` (alat) + `select` (dashboard), **tidak ada** `update`/`delete` publik.
 
-Ditemukan bahwa kolom `sensors.created_at` diberi label UTC (`+00`) oleh
-Supabase, **padahal angka jam yang tersimpan sebenarnya sudah WIB**
-(device/pipeline pengirim data salah label — bukan benar-benar UTC). Ini
-bug di sisi sumber data, di luar kendali dashboard, dan **tidak diubah**
-(sesuai prinsip non-destructive) — kompensasinya dilakukan di sisi
-dashboard:
+### 4.6 ⏱️ Kuirk Waktu `created_at` (Penting!)
 
-- `lib/deviceStatus.ts` — jam ditampilkan apa adanya (tidak dikonversi
-  timezone lagi), dan perhitungan online/offline & "X menit lalu"
-  dikonversi balik dengan MENGURANGI 7 jam untuk dapat instant UTC yang
-  benar.
-- `lib/sensorTimeOffset.ts` — helper baru untuk menggeser rentang tanggal
-  query (dipakai di Analitik, Download CSV, dan window 24 jam AI
-  Recommendation) supaya cocok dengan cara data tersimpan.
-- `components/analytics/TrendChart.tsx` — label sumbu waktu grafik ambil
-  angka jam langsung dari data, tanpa `toLocaleString` yang bisa
-  menggandakan konversi.
+`sensors.created_at` & `rainfall_readings.created_at` **berlabel UTC (`+00`)**, tapi **angka jamnya sebenarnya WIB** — firmware menulis jam lokal tanpa konversi. Sengaja **tidak diperbaiki di sumbernya** (risiko mengganggu alat produksi), dikompensasi konsisten lewat `lib/sensorTimeOffset.ts` & `lib/deviceStatus.ts`, serta semua view SQL baru.
 
-**Catatan ini HANYA berlaku untuk tabel `sensors`** (asalnya dari device).
-Timestamp yang dibuat sendiri oleh server kita (`ai_recommendations`,
-nanti `weekly_reports`/`backup_logs`) tidak kena masalah ini, karena
-berasal dari jam server Vercel/Postgres yang benar.
+### 4.7 Konfigurasi Operasional Aktual (`lib/config.ts`)
 
-## Fitur Tambahan: Perbandingan dengan BMKG
+| Konstanta | Nilai | Catatan |
+|---|---|---|
+| `OFFLINE_THRESHOLD_MINUTES` | **10 menit** | ~~90 menit (PRD lama)~~ — weather station kini kirim tiap 1 menit |
+| `RAINFALL_OFFLINE_THRESHOLD_MINUTES` | 10 menit | Sensor hujan kirim tiap 1 menit |
+| `SANITY_RANGES.temperature` | 10–45 °C | |
+| `SANITY_RANGES.humidity` | 0–100 % | |
+| `SANITY_RANGES.wind_speed` | 0–40 m/s | |
+| `CALM_WIND_CODE` | `"U"` | Arah angin tidak terdeteksi/calm |
 
-Halaman `/bmkg` membandingkan data sensor Anda dengan prakiraan resmi
-[BMKG](https://data.bmkg.go.id/prakiraan-cuaca/) (gratis, tanpa API key)
-untuk wilayah yang sama.
+> 🔄 **Rekonsiliasi dengan PRD lama:** ambang offline berubah 90→10 menit; RSSI akhirnya disimpan di `rainfall_readings.rssi` (bukan `system_logs.signal_strength` seperti rencana awal).
 
-**Cara pakai:**
-1. Buka halaman `/bmkg`
-2. Isi **kode wilayah adm4** (format `32.04.19.2003`) untuk masing-masing
-   device — kode ini kode kelurahan/desa dari Kemendagri, BUKAN nama
-   lokasi biasa
-3. Setelah disimpan, halaman otomatis ambil data BMKG dan tampilkan
-   perbandingan: Suhu, Kelembaban, Kecepatan Angin, Kondisi Cuaca
+### 4.8 ✅ Fitur Utama (Semua Selesai)
 
-**Cara dapat kode wilayah**: buka
-[data.bmkg.go.id/prakiraan-cuaca](https://data.bmkg.go.id/prakiraan-cuaca/),
-cari lokasi Anda lewat form pilih wilayah, lalu buka Developer Tools (F12)
-→ tab Network → cari request `prakiraan-cuaca?adm4=...` → itu kodenya.
+- 🔴 **Dashboard realtime** — update live tanpa reload
+- 📺 **Mode Kiosk** — satu layar penuh, kolom otomatis menyesuaikan jumlah device
+- 📈 **Analitik** historis per rentang waktu
+- 🤖 **Rekomendasi AI** — rule engine + narasi Groq
+- 📨 **Laporan mingguan Telegram** — otomatis + manual, chart + statistik + rekomendasi
+- 💬 **Command Telegram** (`/laporan`) on-demand
+- ⬇️ **Download CSV/Excel**
+- 🛰️ **Perbandingan BMKG**
+- 🗺️ **Peta lokasi** dengan status weather & hujan terpisah
+- ⏳ **Panel uptime** per alat
+- 📊 **Monitoring kuota & backup**
+- 🛠️ **OTA firmware** dari halaman admin
+- 🖥️ **Serial monitor jarak jauh** tanpa colok USB
+- 🚨 **Alert kritis real-time** — event-driven via Database Webhook
+- 📱 **PWA & SEO dasar**
+- 🎨 **Branding AtmosX** — logo transparan menggantikan judul teks
 
-**Catatan satuan**: BMKG melaporkan kecepatan angin dalam **km/jam**,
-otomatis dikonversi ke **m/s** di `lib/bmkg.ts` biar bisa dibandingkan
-langsung dengan sensor kita.
+### 4.9 🔒 Keamanan & Prinsip Integrasi
 
-**Catatan pembaruan data**: BMKG update prakiraan ~2x/hari, jadi wajar
-kalau tidak 100% sama dengan pembacaan sensor real-time — ini
-perbandingan skala besar (prakiraan wilayah vs pembacaan titik lokasi
-presisi), bukan validasi akurasi sensor.
+- Dashboard hanya pegang **anon key** (read-only default); tulis-menulis lewat `supabaseServer`/`supabaseAdmin` di server-side saja
+- `TELEGRAM_BOT_TOKEN` hanya di kode server, **tidak pernah** di komponen `'use client'`
+- Semua teks dinamis di-`escapeHtml()` sebelum masuk pesan Telegram HTML
+- **Zero perubahan** RLS/skema pada `devices`/`sensors`
 
-**Isi cepat kode wilayah**: kalau tidak mau input manual lewat UI, jalankan
-`supabase/sql/007_bmkg_adm4_defaults.sql` di SQL Editor — sudah terisi
-kode resmi untuk CISANGKUY (Kiangroke) dan CIMINYAK (Baranangsiang).
+---
 
-## Fitur Tambahan: Peta Lokasi Device
+## 5. 🚀 Deployment & Akun
 
-Kartu "Lokasi Device" di Dashboard utama menampilkan peta (OpenStreetMap
-lewat library `leaflet`, gratis tanpa API key) dengan marker per device —
-hijau kalau online, merah kalau offline. Klik marker untuk lihat nama
-device & statusnya. Koordinat GPS device disimpan di
-`lib/config.ts` → `DEVICE_COORDINATES` (bukan di database, karena ini
-data statis lokasi fisik alat).
+### 5.1 Platform & Akun Produksi
 
-## Catatan: Auto-Refresh
+| Platform | Peran | Akun |
+|---|---|---|
+| ☁️ **Supabase** | Database + Realtime + Storage + Edge Functions + pg_cron | `aws.t4t@yahoo.com` |
+| ▲ **Vercel** | Hosting dashboard Next.js | `hasani.devtech@gmail.com` |
 
-- **Dashboard (kartu sensor)**: otomatis update via Supabase Realtime,
-  tidak perlu reload sama sekali.
-- **Analitik (grafik & statistik)**: auto-refresh tiap **2 menit** di
-  background (tanpa mengganggu tampilan/spinner), plus tombol
-  "🔄 Refresh" untuk update instan kapan saja + label "update terakhir".
-- Halaman lain (BMKG, Backup, Rekomendasi AI, Laporan) masih ambil data
-  fresh setiap kali halaman itu **dibuka/dinavigasi ulang** (server-side,
-  `revalidate = 0`), tapi belum auto-refresh berkala kalau dibiarkan
-  terbuka lama tanpa berpindah halaman.
+> 🔑 Simpan info ini baik-baik — dua akun inilah yang memegang seluruh infrastruktur cloud sistem (database produksi, kredensial ESP32, dan hosting dashboard publik). Pertimbangkan mengaktifkan 2FA di kedua akun kalau belum.
 
-## Fitur Tambahan: PWA (Add to Home Screen)
+### 5.2 Proses Deploy
 
-Sekarang dashboard bisa "di-install" ke home screen HP seperti aplikasi
-native — lewat `app/manifest.ts` (konvensi Next.js, otomatis di-link) +
-icon di `public/icon-192.png`, `public/icon-512.png`,
-`public/apple-touch-icon.png`. Di Android/Chrome biasanya muncul prompt
-"Add to Home Screen" otomatis; di iOS/Safari, buka menu Share → "Add to
-Home Screen".
+| Komponen | Cara deploy |
+|---|---|
+| **Web (Next.js)** | Push ke Vercel — otomatis build & deploy. `vercel.json` sengaja `"crons": []`; semua penjadwalan dipindah ke **pg_cron Supabase** (lebih andal, tidak kena limit Vercel Cron) |
+| **Edge Functions** | Deploy manual per function ke Supabase (`supabase/functions/<nama>/index.ts`) via CLI/dashboard |
+| **Migrasi SQL** | Jalankan berurutan di Supabase SQL Editor, `001_...sql` → `015_...sql`, masing-masing idempotent |
+| **Env vars (server-only)** | Supabase URL & key, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, Groq API key — hanya di secrets Vercel/Supabase, tidak pernah di-bundle ke client |
 
-## Fitur Tambahan: SEO / Preview Link (Open Graph)
+---
 
-Link dashboard sekarang punya preview yang layak kalau di-share ke
-Telegram/WhatsApp — gambar preview di `app/opengraph-image.png` (dideteksi
-otomatis oleh Next.js), plus metadata title/description lengkap di
-`app/layout.tsx`.
+## 6. 🐛 Riwayat Bug & Perbaikan ("War Stories")
 
-## Fitur Tambahan: Kartu VPD
+Dicatat supaya tidak terulang:
 
-Tiap kartu sensor di Dashboard sekarang juga menampilkan **VPD (Vapor
-Pressure Deficit)** — dihitung dari suhu & kelembaban real-time
-(`lib/rules/ruleEngine.ts` → `calcVPD`/`classifyVPD`, sama seperti yang
-dipakai AI Recommendation), dengan warna berbeda tergantung kelasnya
-(hijau=rendah, kuning=sedang, merah=tinggi).
+> **1. Telegram gagal total:** *"can't parse entities: Unsupported start tag"*
+> Teks rekomendasi AI kadang mengandung `<` (mis. "<50%") → Telegram kira itu tag HTML belum ditutup → **seluruh pesan** gagal, bukan cuma bagian itu.
+> ✅ Fix: `escapeHtml()` diterapkan ke semua teks dinamis di **dua file** (`supabase/functions/weekly-report/index.ts` dan `lib/weeklyReport.ts` — logic terduplikasi antara jalur otomatis & manual).
 
-## Fitur Tambahan: Alert Real-time (Kritis)
+> **2. Deploy Edge Function gagal:** *"Module not found .../supabase"*
+> File yang ditempel ke editor Supabase adalah `lib/weeklyReport.ts` (Next.js, `import ... from "./supabase"`) — bukan file Deno yang benar.
+> ✅ Fix: pastikan yang di-deploy selalu dari folder `supabase/functions/`, pakai import URL `https://esm.sh/...`.
 
-Selain AI Recommendation yang jalan 1x/hari, sekarang ada lapisan kedua:
-begitu ada data sensor BARU masuk dan kondisinya masuk kategori
-**KRITIS** (suhu tinggi + kelembaban rendah), **langsung** kirim alert ke
-Telegram saat itu juga — tidak perlu nunggu sampai laporan harian.
+> **3. Teks kiosk tak terlihat (dark-on-dark)**
+> Skala warna `slate` **di-invert** khusus di `.dark` — `text-slate-900` polos sudah otomatis adaptif; menambah `dark:text-slate-*` di atasnya men-double-invert jadi gelap-di-atas-gelap.
+> ✅ Fix: hapus semua `dark:text-slate-*`/`dark:bg-slate-900` dari komponen kiosk.
 
-### Setup
+> **4. Ruang kosong di layout kiosk**
+> (a) Kolom grid statis `xl:grid-cols-3` menyisakan kolom kosong untuk 2 device; (b) `flex-1` bersarang tidak reliable meregang tinggi di semua browser.
+> ✅ Fix: kolom dinamis sesuai jumlah device + CSS Grid eksplisit `grid-rows-[auto_auto_1fr]`.
 
-1. **Deploy Edge Function** `realtime-alert-check` (Supabase Dashboard →
-   Edge Functions → Deploy a new function → Via Editor → nama persis
-   `realtime-alert-check` → paste isi
-   `supabase/functions/realtime-alert-check/index.ts`).
-2. **Matikan "Enforce JWT Verification"** untuk function ini (sama seperti
-   `telegram-webhook`).
-3. **Tambahkan secret** `REALTIME_ALERT_SECRET` di Edge Function Secrets.
-4. **Buat Database Webhook**: Supabase Dashboard → Database → Webhooks →
-   Create a new webhook:
-   - Name: `realtime-critical-alert`
-   - Table: `sensors`
-   - Events: **Insert** saja
-   - Type: HTTP Request
-   - URL: `https://<PROJECT_REF>.supabase.co/functions/v1/realtime-alert-check`
-   - HTTP Headers: tambahkan `x-realtime-alert-secret: <isi sesuai REALTIME_ALERT_SECRET>`
-5. Tidak perlu jadwal cron apapun — ini murni event-driven, jalan
-   otomatis setiap ada INSERT baru ke `sensors`.
+---
 
-## Perubahan Besar: Interval Akuisisi Data Sesuai Standar WMO
+## 7. 📚 Referensi Silang Dokumen
 
-Firmware device sekarang mengirim hasil **rata-rata tiap 5 menit**
-langsung (BUKAN data mentah tiap 1 menit — sempat ada asumsi salah soal
-ini di iterasi sebelumnya, sudah dikoreksi). Jadi web/dashboard TIDAK
-perlu menghitung ulang rata-rata apapun — tinggal ambil apa adanya,
-persis seperti pendekatan sebelumnya waktu interval masih 1 jam, cuma
-sekarang datanya jauh lebih rapat (tiap 5 menit, bukan tiap jam).
+| Pertanyaan | Lihat |
+|---|---|
+| Fitur apa saja sudah dibangun (naratif per fase)? | `README.md` |
+| Rencana/skema awal proyek (historis, sebagian usang) | `PRD_Dashboard_Monitoring_AWS_T4T.md` |
+| Konstanta operasional aktual | `lib/config.ts` |
+| Logic rule engine AI | `lib/rules/ruleEngine.ts` |
+| Tipe data TypeScript lengkap | `lib/types.ts` |
+| Skema SQL lengkap (kronologis) | `supabase/sql/001_...sql` – `015_...sql` |
+| Firmware rain gauge | `Firmware Rainfall Cisangkuy.ino`, `...Ciminyak.ino` |
 
-Window 5 menit ini sudah sesuai standar WMO (rentang rata-rata 1-10
-menit untuk suhu/kelembaban/curah hujan). Perhitungan cara averaging
-untuk masing-masing parameter (arah angin pakai modus/vector, curah
-hujan diakumulasi, dsb) jadi tanggung jawab firmware — pastikan tim
-firmware sudah menerapkan itu di sisi alat.
+<div align="center">
 
-### File yang Berubah
+---
 
-- `lib/config.ts` — `OFFLINE_THRESHOLD_MINUTES` diperpendek dari 90 ke
-  **15 menit** (3x interval kirim baru 5 menit, kasih buffer wajar)
-- `app/page.tsx`, `components/SensorCardGrid.tsx` — tetap ambil 1 baris
-  terakhir apa adanya (tidak berubah logic-nya, cuma datanya lebih rapat)
-- `lib/statsEngine.ts` — **paginasi diperbaiki** (kritis!): sebelumnya
-  limit tetap 5000 baris. Dengan interval 5 menit, 30 hari = ~8.640
-  baris/device — sudah melebihi limit lama, jadi tanpa perbaikan ini
-  Analitik & Export Excel bisa kepotong diam-diam untuk rentang panjang.
-- `lib/recommendationEngine.ts` — limit query curah hujan 24 jam
-  dinaikkan (jaga-jaga, 288 baris/hari dengan interval 5 menit)
-- `supabase/functions/weekly-report/index.ts`,
-  `supabase/functions/telegram-webhook/index.ts` — paginasi diperbaiki
-  (laporan mingguan/bulanan & command `/laporan` custom range bisa minta
-  rentang yang totalnya melebihi limit lama)
-- `supabase/functions/realtime-alert-check/index.ts` — TETAP cek 1 baris
-  langsung (karena sudah representatif dari firmware), tapi ditambah
-  **cooldown 30 menit** per device supaya tidak spam kalau kondisi kritis
-  berlangsung lama (tanpa ini, interval kirim 5 menit bisa berarti alert
-  baru tiap 5 menit terus-menerus selama kondisi masih kritis)
+*Dokumen ini mengikuti kode aktual, bukan rencana lama. Perbarui bagian yang relevan setiap kali ada perubahan besar pada skema, firmware, atau alur data.*
 
-### Yang TIDAK Perlu Diubah
+**🌦️ AtmosX — AWS T4T Monitoring System**
 
-`generate-recommendation` (rekomendasi AI harian) sudah lebih dulu
-dirombak jadi berbasis agregat 24 jam — otomatis tetap benar dengan
-volume data yang lebih rapat, tidak perlu disentuh lagi.
-
-## Curah Hujan dari Sensor Terpisah (`rainfall_readings`)
-
-Curah hujan **tidak lagi** dibaca dari kolom `sensors.rainfall`. Sensor hujan
-sekarang ESP tersendiri (tipping bucket SEN0575) yang kirim tiap 1 menit ke
-tabel `rainfall_readings`. Id device yang sama dipakai di `sensors` dan
-`rainfall_readings` untuk lokasi yang sama, jadi cukup dicocokkan lewat
-`device.id` — tidak perlu tabel pemetaan.
-
-- Dashboard: kartu cuaca (`SensorCard`) dan kartu hujan (`RainfallCard`)
-  terpisah, dengan status online/offline masing-masing. Kartu hujan
-  menampilkan akumulasi 1 / 3 / 6 / 12 / 24 jam (bergulir) dan total sejak
-  00:00 WIB.
-- Analitik, Excel, laporan mingguan, rekomendasi AI, dan bot Telegram
-  memakai total hujan dari database (fungsi RPC `rainfall_total` dan
-  `rainfall_buckets`).
-- CSV: cuaca dan curah hujan diunduh sebagai dua file terpisah.
-- Semua akses ke data hujan lewat `lib/rainfall.ts`.
-- **Wajib**: jalankan `supabase/sql/008_rainfall_readings.sql` (aman diulang;
-  hanya membuat/mengubah objek khusus hujan, tidak menyentuh `devices` dan
-  `sensors`).
-
-Rincian perubahan & langkah deploy: lihat `CHANGELOG_RAINFALL.md`.
+</div>
