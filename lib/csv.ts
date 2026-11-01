@@ -2,7 +2,8 @@ import { supabase } from "./supabase";
 import { SensorReading } from "./types";
 import { DateRange } from "./dateRange";
 import { toSensorQueryBoundary } from "./sensorTimeOffset";
-import { RainfallRow } from "./rainfall";
+import { RainfallRow, RainBucket } from "./rainfall";
+import { buildCumulative, computeDailyRainStats, formatRainBucketForCsv } from "./rainfallSeries";
 // calcVPD murni matematika (sama rumus yang dipakai di SensorCard/BmkgCompareCard),
 // dipakai supaya CSV mentah ini juga punya kolom VPD per baris.
 import { calcVPD } from "./rules/ruleEngine";
@@ -134,6 +135,56 @@ export function buildRainfallCsv(
         r.rainfall ?? "",
       ].join(",")
     );
+  }
+
+  return lines.join("\n");
+}
+
+/**
+ * CSV curah hujan yang sudah diringkas per JAM atau per HARI (hasil
+ * fetchRainfallBuckets), satu blok baris per device.
+ *  - rain_mm       : total hujan pada jam/hari itu
+ *  - akumulasi_mm  : total berjalan dari awal periode sampai baris itu
+ *                    (dihitung per device, mulai dari 0 lagi untuk device lain)
+ * Khusus per HARI ada satu kolom lagi:
+ *  - rata_rata_harian_periode_mm : rata-rata mm/hari seluruh periode untuk
+ *                    device itu (nilainya sama di semua baris device tsb,
+ *                    supaya mudah dibuat garis acuan di Excel)
+ * Hari/jam tanpa data (sensor mati) tidak punya baris -- bukan ditulis 0.
+ */
+export function buildRainfallAggregateCsv(
+  perDevice: { deviceId: number; buckets: RainBucket[] }[],
+  deviceTypeById: Record<number, string>,
+  resolution: "hour" | "day"
+): string {
+  const isDay = resolution === "day";
+  const header = [
+    isDay ? "tanggal" : "waktu",
+    "device_id",
+    "device_type",
+    "rain_mm",
+    "akumulasi_mm",
+    ...(isDay ? ["rata_rata_harian_periode_mm"] : []),
+  ];
+
+  const lines = [header.join(",")];
+
+  for (const { deviceId, buckets } of perDevice) {
+    const points = buildCumulative(buckets);
+    const avg = isDay ? computeDailyRainStats(buckets).avgPerDay : null;
+
+    for (const p of points) {
+      lines.push(
+        [
+          formatRainBucketForCsv(p.bucket),
+          deviceId,
+          csvEscape(deviceTypeById[deviceId] ?? ""),
+          p.perBucket,
+          p.cumulative,
+          ...(isDay ? [avg ?? ""] : []),
+        ].join(",")
+      );
+    }
   }
 
   return lines.join("\n");

@@ -3,13 +3,7 @@
 import { useState } from "react";
 import { Device } from "@/lib/types";
 import { PeriodPreset, getPeriodRange } from "@/lib/dateRange";
-import {
-  fetchAllReadingsInRange,
-  buildCsv,
-  buildRainfallCsv,
-  triggerCsvDownload,
-} from "@/lib/csv";
-import { fetchAllRainfallRowsInRange } from "@/lib/rainfall";
+import { fetchAllReadingsInRange, buildCsv, triggerCsvDownload } from "@/lib/csv";
 import PeriodSelector from "@/components/analytics/PeriodSelector";
 
 const ALL_DEVICES_VALUE = "all";
@@ -28,7 +22,7 @@ export default function DownloadClient({ devices }: { devices: Device[] }) {
     devices.map((d) => [d.id, d.type])
   );
 
-  async function handleDownload(kind: "sensor" | "rainfall") {
+  async function handleDownload() {
     if (preset === "custom" && (!customStart || !customEnd)) {
       setErrorMsg("Pilih tanggal awal dan akhir dulu untuk custom range.");
       return;
@@ -46,18 +40,9 @@ export default function DownloadClient({ devices }: { devices: Device[] }) {
           ? devices.map((d) => d.id)
           : [Number(deviceSelection)];
 
-      let csv = "";
-      let rowCount = 0;
-
-      if (kind === "sensor") {
-        const readings = await fetchAllReadingsInRange(deviceIds, range);
-        rowCount = readings.length;
-        if (rowCount > 0) csv = buildCsv(readings, deviceTypeById);
-      } else {
-        const rainRows = await fetchAllRainfallRowsInRange(deviceIds, range);
-        rowCount = rainRows.length;
-        if (rowCount > 0) csv = buildRainfallCsv(rainRows, deviceTypeById);
-      }
+      const readings = await fetchAllReadingsInRange(deviceIds, range);
+      const rowCount = readings.length;
+      const csv = rowCount > 0 ? buildCsv(readings, deviceTypeById) : "";
 
       if (rowCount === 0) {
         setErrorMsg("Tidak ada data pada rentang tanggal yang dipilih.");
@@ -70,8 +55,7 @@ export default function DownloadClient({ devices }: { devices: Device[] }) {
           : deviceTypeById[Number(deviceSelection)]?.toLowerCase() ?? "device";
 
       const fmtDate = (d: Date) => d.toISOString().slice(0, 10);
-      const filePrefix = kind === "sensor" ? "sensor-data" : "curah-hujan";
-      const filename = `${filePrefix}_${deviceLabel}_${fmtDate(range.start)}_sd_${fmtDate(
+      const filename = `sensor-data_${deviceLabel}_${fmtDate(range.start)}_sd_${fmtDate(
         new Date(range.end.getTime() - 1)
       )}.csv`;
 
@@ -111,22 +95,13 @@ export default function DownloadClient({ devices }: { devices: Device[] }) {
         />
       </div>
 
-      <div className="flex flex-wrap gap-3">
-        <button
-          onClick={() => handleDownload("sensor")}
-          disabled={loading}
-          className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-on-strong transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {loading ? "Menyiapkan file..." : "Download CSV Cuaca"}
-        </button>
-        <button
-          onClick={() => handleDownload("rainfall")}
-          disabled={loading}
-          className="rounded-lg border border-slate-300 bg-surface px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {loading ? "Menyiapkan file..." : "Download CSV Curah Hujan"}
-        </button>
-      </div>
+      <button
+        onClick={handleDownload}
+        disabled={loading}
+        className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-on-strong transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {loading ? "Menyiapkan file..." : "Download CSV Cuaca"}
+      </button>
 
       {errorMsg && <p className="text-sm text-rose-600 dark:text-rose-400">{errorMsg}</p>}
       {lastDownloadInfo && (
@@ -137,8 +112,9 @@ export default function DownloadClient({ devices }: { devices: Device[] }) {
         Catatan: file CSV berisi data mentah apa adanya (termasuk baris yang
         mungkin dianggap anomali/glitch sensor di halaman Analitik) — cocok
         untuk keperluan audit atau analisis lebih lanjut di luar dashboard.
-        Data cuaca (suhu, kelembaban, angin) dan data curah hujan berasal dari
-        alat yang berbeda, jadi diunduh sebagai dua file terpisah.
+        File ini hanya berisi data cuaca (suhu, kelembaban, angin). Data curah
+        hujan berasal dari alat yang berbeda dan diunduh lewat bagian "Download
+        Curah Hujan" di atas.
       </p>
     </div>
   );

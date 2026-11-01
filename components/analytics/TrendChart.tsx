@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import {
-  ComposedChart,
-  Bar,
+  LineChart,
   Line,
   XAxis,
   YAxis,
@@ -13,7 +12,10 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { SensorReading } from "@/lib/types";
-import { RainBucket } from "@/lib/rainfall";
+
+// Catatan: curah hujan SENGAJA tidak ada di grafik ini. Skalanya (mm) beda
+// jauh dari suhu/kelembaban/angin sehingga batangnya nyaris tak terlihat
+// kalau digabung -- grafiknya ada terpisah di components/analytics/RainfallCharts.tsx.
 
 // ⚠️ Sama seperti di lib/deviceStatus.ts: timestamp sensor diberi label
 // "+00" (UTC) padahal angkanya sudah WIB. Untuk label sumbu waktu di
@@ -36,27 +38,19 @@ function formatSensorTimeLabel(iso: string): string {
   return `${dd} ${MONTH_LABELS[month - 1]} ${hh}:${mm}`;
 }
 
-type MetricKey = "Suhu" | "Kelembaban" | "Kec. Angin" | "Curah Hujan";
+type MetricKey = "Suhu" | "Kelembaban" | "Kec. Angin";
 
-const METRICS: { key: MetricKey; color: string; type: "line" | "bar" }[] = [
-  { key: "Suhu", color: "#f97316", type: "line" },
-  { key: "Kelembaban", color: "#0ea5e9", type: "line" },
-  { key: "Kec. Angin", color: "#8b5cf6", type: "line" },
-  { key: "Curah Hujan", color: "#38bdf8", type: "bar" },
+const METRICS: { key: MetricKey; color: string }[] = [
+  { key: "Suhu", color: "#f97316" },
+  { key: "Kelembaban", color: "#0ea5e9" },
+  { key: "Kec. Angin", color: "#8b5cf6" },
 ];
 
-export default function TrendChart({
-  readings,
-  rainBuckets,
-}: {
-  readings: SensorReading[];
-  rainBuckets: RainBucket[];
-}) {
+export default function TrendChart({ readings }: { readings: SensorReading[] }) {
   const [visible, setVisible] = useState<Record<MetricKey, boolean>>({
     Suhu: true,
     Kelembaban: true,
     "Kec. Angin": true,
-    "Curah Hujan": true,
   });
 
   function toggle(key: MetricKey) {
@@ -73,30 +67,12 @@ export default function TrendChart({
     );
   }
 
-  // Curah hujan berasal dari tabel & ESP terpisah (rainfall_readings) dan
-  // dijumlahkan per JAM di database. Batang hujan diletakkan di pembacaan
-  // cuaca PERTAMA pada jam tersebut (kunci "YYYY-MM-DDTHH" sama dengan
-  // format bucket dari fungsi rainfall_buckets), jadi tiap jam hanya punya
-  // satu batang berisi total mm jam itu — bukan diulang di tiap menit.
-  const rainByHour: Record<string, number> = {};
-  for (const b of rainBuckets) rainByHour[b.bucket] = b.rain_mm;
-  const hourAlreadyPlaced = new Set<string>();
-
-  const data = readings.map((r) => {
-    const hourKey = r.created_at.slice(0, 13);
-    let rain: number | null = null;
-    if (!hourAlreadyPlaced.has(hourKey) && rainByHour[hourKey] !== undefined) {
-      rain = rainByHour[hourKey];
-      hourAlreadyPlaced.add(hourKey);
-    }
-    return {
-      time: formatSensorTimeLabel(r.created_at),
-      Suhu: r.temperature,
-      Kelembaban: r.humidity,
-      "Kec. Angin": r.wind_speed,
-      "Curah Hujan": rain,
-    };
-  });
+  const data = readings.map((r) => ({
+    time: formatSensorTimeLabel(r.created_at),
+    Suhu: r.temperature,
+    Kelembaban: r.humidity,
+    "Kec. Angin": r.wind_speed,
+  }));
 
   const anyVisible = METRICS.some((m) => visible[m.key]);
 
@@ -133,66 +109,31 @@ export default function TrendChart({
       ) : (
         <div className="h-72 w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={data} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+            <LineChart data={data} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
               <XAxis dataKey="time" tick={{ fontSize: 10 }} minTickGap={30} />
-              <YAxis yAxisId="left" tick={{ fontSize: 10 }} />
-              <YAxis
-                yAxisId="right"
-                orientation="right"
-                tick={{ fontSize: 10 }}
-                label={{ value: "mm", angle: 90, position: "insideRight", fontSize: 10 }}
-              />
+              <YAxis tick={{ fontSize: 10 }} />
               <Tooltip />
               <Legend wrapperStyle={{ fontSize: 12 }} />
 
-              {visible["Curah Hujan"] && (
-                <Bar
-                  yAxisId="right"
-                  dataKey="Curah Hujan"
-                  fill="#38bdf8"
-                  barSize={8}
-                  opacity={0.6}
-                />
-              )}
-              {visible["Suhu"] && (
+              {METRICS.filter((m) => visible[m.key]).map((m) => (
                 <Line
-                  yAxisId="left"
+                  key={m.key}
                   type="monotone"
-                  dataKey="Suhu"
-                  stroke="#f97316"
+                  dataKey={m.key}
+                  stroke={m.color}
                   dot={false}
                   strokeWidth={2}
                 />
-              )}
-              {visible["Kelembaban"] && (
-                <Line
-                  yAxisId="left"
-                  type="monotone"
-                  dataKey="Kelembaban"
-                  stroke="#0ea5e9"
-                  dot={false}
-                  strokeWidth={2}
-                />
-              )}
-              {visible["Kec. Angin"] && (
-                <Line
-                  yAxisId="left"
-                  type="monotone"
-                  dataKey="Kec. Angin"
-                  stroke="#8b5cf6"
-                  dot={false}
-                  strokeWidth={2}
-                />
-              )}
-            </ComposedChart>
+              ))}
+            </LineChart>
           </ResponsiveContainer>
         </div>
       )}
 
       <p className="mt-2 text-[11px] text-slate-400">
-        Suhu (°C), Kelembaban (%), dan Kecepatan Angin (m/s) memakai sumbu kiri.
-        Curah Hujan (mm per jam, batang) memakai sumbu kanan karena skalanya berbeda.
+        Suhu (°C), Kelembaban (%), dan Kecepatan Angin (m/s) memakai sumbu yang sama.
+        Grafik curah hujan ada di bagian terpisah di bawah.
       </p>
     </div>
   );

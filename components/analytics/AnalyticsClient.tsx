@@ -8,6 +8,7 @@ import { fetchRainfallBuckets, fetchRainfallTotal, RainBucket } from "@/lib/rain
 import PeriodSelector from "./PeriodSelector";
 import StatsSummary from "./StatsSummary";
 import TrendChart from "./TrendChart";
+import RainfallCharts from "./RainfallCharts";
 import LocationComparison from "./LocationComparison";
 
 const AUTO_REFRESH_INTERVAL_MS = 2 * 60 * 1000; // 2 menit
@@ -23,7 +24,8 @@ export default function AnalyticsClient({ devices }: { devices: Device[] }) {
   const [currentStats, setCurrentStats] = useState<PeriodStats | null>(null);
   const [previousStats, setPreviousStats] = useState<PeriodStats | null>(null);
   const [statsByDevice, setStatsByDevice] = useState<Record<number, PeriodStats | null>>({});
-  const [rainBuckets, setRainBuckets] = useState<RainBucket[]>([]);
+  const [rainHourly, setRainHourly] = useState<RainBucket[]>([]);
+  const [rainDaily, setRainDaily] = useState<RainBucket[]>([]);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
 
   const loadData = useCallback(
@@ -40,7 +42,7 @@ export default function AnalyticsClient({ devices }: { devices: Device[] }) {
         // Cuaca (tabel `sensors`) dan curah hujan (tabel `rainfall_readings`,
         // ESP terpisah) diambil terpisah, lalu digabung di sini. Total hujan
         // dijumlahkan di database (RPC), bukan diunduh baris demi baris.
-        const [allCurrentResults, previous, rainHourly] = await Promise.all([
+        const [allCurrentResults, previous, hourly, daily] = await Promise.all([
           Promise.all(
             devices.map(async (d) => {
               const [readings, rainTotal] = await Promise.all([
@@ -58,6 +60,7 @@ export default function AnalyticsClient({ devices }: { devices: Device[] }) {
             fetchRainfallTotal(deviceId as number, prevRange),
           ]),
           fetchRainfallBuckets(deviceId as number, range, "hour"),
+          fetchRainfallBuckets(deviceId as number, range, "day"),
         ]);
 
         const [previousReadings, previousRain] = previous;
@@ -73,7 +76,8 @@ export default function AnalyticsClient({ devices }: { devices: Device[] }) {
           ...computeStats(previousReadings),
           totalRainfall: previousRain,
         });
-        setRainBuckets(rainHourly);
+        setRainHourly(hourly);
+        setRainDaily(daily);
         setLastUpdatedAt(new Date());
       } catch (err) {
         console.error("Gagal memuat analitik:", err);
@@ -164,7 +168,8 @@ export default function AnalyticsClient({ devices }: { devices: Device[] }) {
       {!loading && currentStats && (
         <>
           <StatsSummary current={currentStats} previous={previousStats} />
-          <TrendChart readings={currentStats.series} rainBuckets={rainBuckets} />
+          <TrendChart readings={currentStats.series} />
+          <RainfallCharts hourBuckets={rainHourly} dayBuckets={rainDaily} />
           <LocationComparison devices={devices} statsByDevice={statsByDevice} />
         </>
       )}

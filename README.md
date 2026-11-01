@@ -188,10 +188,10 @@ Kolom `sensors.rainfall` adalah **peninggalan** desain lama (rencana awal: hujan
 |---|---|
 | `/` | 🏠 Dashboard utama — kartu realtime, status online/offline, uptime, peta |
 | `/kiosk` | 📺 Mode kiosk satu-layar-penuh untuk TV/monitor tanpa penjaga |
-| `/analytics` | 📈 Tren historis suhu/kelembaban/angin/hujan |
+| `/analytics` | 📈 Tren suhu/kelembaban/angin + **grafik curah hujan terpisah** (per jam/hari, akumulasi, harian & rata-rata) |
 | `/recommendations` | 🤖 Rekomendasi AI (VPD, risiko, narasi Groq) |
 | `/reports` | 📨 Riwayat & generate manual laporan mingguan Telegram |
-| `/download` | ⬇️ Unduh data CSV / Excel |
+| `/download` | ⬇️ Laporan Excel, **CSV khusus curah hujan** (per hari / per jam / mentah), CSV cuaca mentah |
 | `/bmkg` | 🛰️ Perbandingan dengan data resmi BMKG |
 | `/kuota` | 📊 Monitoring kuota pemakaian |
 | `/backups` | 💾 Status backup otomatis |
@@ -275,11 +275,11 @@ Semua tabel baru: RLS `anon` boleh `insert` (alat) + `select` (dashboard), **tid
 
 - 🔴 **Dashboard realtime** — update live tanpa reload
 - 📺 **Mode Kiosk** — satu layar penuh, kolom otomatis menyesuaikan jumlah device
-- 📈 **Analitik** historis per rentang waktu
+- 📈 **Analitik** historis per rentang waktu — curah hujan punya 3 grafik sendiri (per jam/hari, akumulasi, harian + garis rata-rata)
 - 🤖 **Rekomendasi AI** — rule engine + narasi Groq
 - 📨 **Laporan mingguan Telegram** — otomatis + manual, chart + statistik + rekomendasi
 - 💬 **Command Telegram** (`/laporan`) on-demand
-- ⬇️ **Download CSV/Excel**
+- ⬇️ **Download CSV/Excel** — termasuk unduhan khusus curah hujan (per hari/jam/mentah, lengkap dengan akumulasi)
 - 🛰️ **Perbandingan BMKG**
 - 🗺️ **Peta lokasi** dengan status weather & hujan terpisah
 - ⏳ **Panel uptime** per alat

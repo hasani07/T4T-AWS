@@ -3,6 +3,7 @@ import PageShell from "@/components/PageShell";
 import { Device } from "@/lib/types";
 import DownloadClient from "@/components/download/DownloadClient";
 import ExcelReportClient from "@/components/download/ExcelReportClient";
+import RainfallDownloadClient from "@/components/download/RainfallDownloadClient";
 
 export const revalidate = 0;
 
@@ -30,8 +31,8 @@ export default async function DownloadPage() {
             Download Data Sensor
           </h1>
           <p className="mt-1 text-sm text-slate-500">
-            Export data sensor — CSV mentah, atau laporan Excel teragregasi
-            dengan grafik.
+            Export data sensor — laporan Excel teragregasi dengan grafik, CSV
+            khusus curah hujan, atau CSV cuaca mentah.
           </p>
         </header>
 
@@ -50,7 +51,14 @@ export default async function DownloadPage() {
 
             <div className="rounded-2xl border border-slate-200 bg-surface p-5">
               <h2 className="mb-3 text-sm font-semibold text-slate-900">
-                CSV Mentah (Data Apa Adanya)
+                Download Curah Hujan (Khusus Sensor Hujan)
+              </h2>
+              <RainfallDownloadClient devices={devices} />
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-surface p-5">
+              <h2 className="mb-3 text-sm font-semibold text-slate-900">
+                CSV Cuaca Mentah (Suhu, Kelembaban, Angin)
               </h2>
               <DownloadClient devices={devices} />
             </div>
