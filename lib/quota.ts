@@ -1,4 +1,4 @@
-import { supabase } from "./supabase";
+import { getSupabaseFresh } from "./supabaseFresh";
 
 // Baris tabel device_quota apa adanya (angka bisa datang sebagai string dari
 // PostgREST, jadi field numerik dibiarkan `number` di sini dan dirapikan oleh
@@ -20,7 +20,9 @@ export interface DeviceQuotaRow {
 export async function fetchDeviceQuotas(deviceIds: number[]): Promise<Record<number, DeviceQuotaRow>> {
   if (deviceIds.length === 0) return {};
 
-  const { data, error } = await supabase
+  // Client "fresh" (tanpa cache): tanggal isi ulang harus selalu yang terbaru,
+  // lihat catatan di lib/supabaseFresh.ts.
+  const { data, error } = await getSupabaseFresh()
     .from("device_quota")
     .select("device_id, provider_phone, cycle_days, last_refill_date, last_reminder_at, last_reminder_zone")
     .in("device_id", deviceIds);
