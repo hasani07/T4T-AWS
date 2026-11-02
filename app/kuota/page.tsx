@@ -1,12 +1,16 @@
-import { supabase } from "@/lib/supabase";
+import { getSupabaseFresh } from "@/lib/supabaseFresh";
 import { fetchDeviceQuotas } from "@/lib/quota";
 import PageShell from "@/components/PageShell";
 import QuotaCard, { QuotaCardData } from "@/components/kuota/QuotaCard";
 
+// Halaman ini tidak boleh memakai data basi: tanggal isi ulang diubah dari
+// dashboard / Supabase, dan status merah/hijau harus langsung ikut berubah.
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const fetchCache = "force-no-store";
 
 export default async function KuotaPage() {
-  const { data: devices, error } = await supabase.from("devices").select("id, type").order("id", { ascending: true });
+  const { data: devices, error } = await getSupabaseFresh().from("devices").select("id, type").order("id", { ascending: true });
 
   if (error || !devices) {
     return (
