@@ -25,8 +25,15 @@ export function getSupabaseServer(): SupabaseClient {
     );
   }
 
+  // `cache: "no-store"` disengaja: tanpa ini hasil query bisa tersangkut di
+  // Data Cache Next.js dan cron/API membaca data basi (mis. pengingat kuota
+  // terus terkirim memakai tanggal isi ulang lama). Lihat lib/supabase.ts.
   cachedClient = createClient(supabaseUrl, serviceRoleKey, {
     auth: { persistSession: false },
+    global: {
+      fetch: (input: RequestInfo | URL, init?: RequestInit) =>
+        fetch(input, { ...init, cache: "no-store" }),
+    },
   });
   return cachedClient;
 }
