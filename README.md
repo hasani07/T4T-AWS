@@ -191,7 +191,7 @@ Kolom `sensors.rainfall` adalah **peninggalan** desain lama (rencana awal: hujan
 | `/analytics` | 📈 Tren suhu/kelembaban/angin + **grafik curah hujan terpisah** (per jam/hari, akumulasi, harian & rata-rata) |
 | `/recommendations` | 🤖 Rekomendasi AI (VPD, risiko, narasi Groq) |
 | `/reports` | 📨 Riwayat & generate manual laporan mingguan Telegram |
-| `/download` | ⬇️ Laporan Excel, **CSV khusus curah hujan** (per hari / per jam / mentah), CSV cuaca mentah |
+| `/download` | ⬇️ Laporan Excel cuaca, **curah hujan khusus**: Excel dengan grafik (per hari / per jam) atau CSV (per hari / per jam / mentah), CSV cuaca mentah |
 | `/bmkg` | 🛰️ Perbandingan dengan data resmi BMKG |
 | `/kuota` | 📊 Monitoring kuota pemakaian |
 | `/backups` | 💾 Status backup otomatis |

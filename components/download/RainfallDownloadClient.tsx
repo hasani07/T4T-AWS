@@ -41,6 +41,7 @@ export default function RainfallDownloadClient({ devices }: { devices: Device[] 
   const [resolution, setResolution] = useState<Resolution>("day");
 
   const [loading, setLoading] = useState(false);
+  const [excelLoading, setExcelLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [lastDownloadInfo, setLastDownloadInfo] = useState<string | null>(null);
 
@@ -109,7 +110,68 @@ export default function RainfallDownloadClient({ devices }: { devices: Device[] 
     }
   }
 
+  // Excel (tabel + grafik) dibuat di server: grafiknya dirender jadi gambar
+  // lalu ditempel ke file. Format mentah per menit tidak didukung (terlalu
+  // banyak baris untuk digrafikkan), jadi otomatis memakai per hari.
+  async function handleExcelDownload() {
+    if (preset === "custom" && (!customStart || !customEnd)) {
+      setErrorMsg("Pilih tanggal awal dan akhir dulu untuk custom range.");
+      return;
+    }
+
+    setExcelLoading(true);
+    setErrorMsg(null);
+    setLastDownloadInfo(null);
+
+    try {
+      const range = getPeriodRange(preset, customStart, customEnd);
+      const deviceIds =
+        deviceSelection === ALL_DEVICES_VALUE
+          ? devices.map((d) => d.id)
+          : [Number(deviceSelection)];
+      const excelResolution = resolution === "hour" ? "hour" : "day";
+
+      const res = await fetch("/api/rainfall/export-excel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          deviceIds,
+          start: range.start.toISOString(),
+          end: range.end.toISOString(),
+          resolution: excelResolution,
+        }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => null);
+        throw new Error(errData?.error || "Gagal membuat file Excel.");
+      }
+
+      const blob = await res.blob();
+      const disposition = res.headers.get("Content-Disposition") ?? "";
+      const match = disposition.match(/filename="(.+)"/);
+      const filename = match ? match[1] : "curah-hujan.xlsx";
+
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      setLastDownloadInfo(`File "${filename}" berhasil didownload.`);
+    } catch (err) {
+      console.error("Gagal export Excel curah hujan:", err);
+      setErrorMsg(err instanceof Error ? err.message : "Gagal membuat file Excel.");
+    } finally {
+      setExcelLoading(false);
+    }
+  }
+
   const activeHint = RESOLUTIONS.find((r) => r.value === resolution)?.hint;
+  const busy = loading || excelLoading;
 
   return (
     <div className="space-y-5">
@@ -157,18 +219,34 @@ export default function RainfallDownloadClient({ devices }: { devices: Device[] 
         {activeHint && <p className="mt-2 text-xs text-slate-400">{activeHint}</p>}
       </div>
 
-      <button
-        onClick={handleDownload}
-        disabled={loading}
-        className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-on-strong transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        {loading ? "Menyiapkan file..." : "Download CSV Curah Hujan"}
-      </button>
+      <div className="flex flex-wrap gap-3">
+        <button
+          onClick={handleExcelDownload}
+          disabled={busy}
+          className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {excelLoading ? "Menyiapkan Excel..." : "Export Excel (dengan Grafik)"}
+        </button>
+        <button
+          onClick={handleDownload}
+          disabled={busy}
+          className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-on-strong transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {loading ? "Menyiapkan file..." : "Download CSV"}
+        </button>
+      </div>
 
       {errorMsg && <p className="text-sm text-rose-600 dark:text-rose-400">{errorMsg}</p>}
       {lastDownloadInfo && (
         <p className="text-sm text-emerald-600 dark:text-emerald-400">{lastDownloadInfo}</p>
       )}
+
+      <p className="text-xs text-slate-400">
+        Excel berisi ringkasan, tabel (hujan, akumulasi, kategori BMKG) dan dua grafik: hujan
+        per hari/jam dengan garis rata-rata harian, serta akumulasi hujan. Kalau memilih semua
+        lokasi, tiap lokasi punya sheet sendiri. Format mentah hanya tersedia sebagai CSV; untuk
+        Excel otomatis dipakai per hari.
+      </p>
 
       <p className="text-xs text-slate-400">
         Hanya berisi data sensor hujan. Hari/jam saat sensor hujan mati tidak punya baris
