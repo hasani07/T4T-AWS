@@ -93,11 +93,11 @@ export default function ForecastExplorer({
       const map = L.map(mapEl.current, { zoomControl: false, attributionControl: true }).setView(center, 8);
       mapRef.current = map;
       L.control.zoom({ position: "bottomright" }).addTo(map);
-      L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
-        attribution:
-          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-        subdomains: "abcd",
-        maxZoom: 19,
+      // Ubin OpenStreetMap, sama dengan peta di Dashboard (DeviceMap). Mode
+      // gelap ditangani filter CSS di app/globals.css (.dark .leaflet-tile-pane).
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        maxZoom: 18,
       }).addTo(map);
 
       forecasts.forEach((f) => {
