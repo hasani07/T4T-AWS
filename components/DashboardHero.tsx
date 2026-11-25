@@ -73,8 +73,9 @@ function StatTile({
             {unit && <span className="ml-0.5 text-sm font-semibold text-slate-400">{unit}</span>}
           </p>
           <p className="truncate text-[11px] font-medium text-slate-500 sm:text-xs">
-            <span className="sm:hidden">{shortLabel}</span>
-            <span className="hidden sm:inline">{label}</span>
+            {/* Label pendek saat tile sempit: HP (2 kolom) & 1024-1279 px (4 kolom + rail) */}
+            <span className="sm:hidden lg:inline xl:hidden">{shortLabel}</span>
+            <span className="hidden sm:inline lg:hidden xl:inline">{label}</span>
           </p>
         </div>
       </div>

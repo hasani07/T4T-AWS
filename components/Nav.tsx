@@ -27,22 +27,29 @@ const NAV_ITEMS = [
   // dipindah jadi pilihan opsional di /kiosk -- Nav ini DISEMBUNYIKAN TOTAL
   // saat di /kiosk (lihat return null di bawah), supaya kiosk tampil layar
   // penuh tanpa navigasi.
-  { href: "/", label: "Dashboard", icon: LayoutGrid },
-  { href: "/kiosk", label: "Kiosk", icon: Tv },
-  { href: "/analytics", label: "Analitik", icon: BarChart3 },
-  // Preview: peta yang zoom ke lokasi + kartu prediksi hujan/suhu 1-3 jam.
-  { href: "/prediksi", label: "Prediksi", icon: CloudRain },
-  { href: "/bmkg", label: "BMKG", icon: CloudSun },
-  { href: "/kuota", label: "Kuota", icon: Smartphone },
-  { href: "/download", label: "Unduh", icon: Download },
-  { href: "/recommendations", label: "AI", icon: Sparkles },
-  { href: "/reports", label: "Laporan", icon: Send },
-  { href: "/backups", label: "Backup", icon: DatabaseBackup },
+  // label = nama pendek (rail laptop kecil & HP), long = nama lengkap
+  // (sidebar lebar di layar >= 1280 px), group = kelompok di sidebar lebar.
+  { href: "/", label: "Dashboard", long: "Dashboard", icon: LayoutGrid, group: "Pantau" },
+  // Peta yang zoom ke lokasi + kartu prediksi hujan/suhu 1-3 jam.
+  { href: "/prediksi", label: "Prediksi", long: "Prediksi Cuaca", icon: CloudRain, group: "Pantau" },
+  { href: "/analytics", label: "Analitik", long: "Analitik", icon: BarChart3, group: "Pantau" },
+  { href: "/bmkg", label: "BMKG", long: "Perbandingan BMKG", icon: CloudSun, group: "Pantau" },
+  { href: "/kiosk", label: "Kiosk", long: "Mode Kiosk", icon: Tv, group: "Pantau" },
+  { href: "/download", label: "Unduh", long: "Unduh Data", icon: Download, group: "Data & Laporan" },
+  { href: "/reports", label: "Laporan", long: "Laporan Telegram", icon: Send, group: "Data & Laporan" },
+  { href: "/recommendations", label: "AI", long: "Rekomendasi AI", icon: Sparkles, group: "Data & Laporan" },
+  { href: "/kuota", label: "Kuota", long: "Kuota Data", icon: Smartphone, group: "Sistem" },
+  { href: "/backups", label: "Backup", long: "Backup", icon: DatabaseBackup, group: "Sistem" },
   // Internal saja (tidak butuh login, tapi tidak dipromosikan ke publik):
   // upload firmware OTA dan serial monitor jarak jauh untuk device rainfall.
-  { href: "/admin/firmware", label: "Firmware", icon: UploadCloud },
-  { href: "/rainfall-monitor", label: "Monitor", icon: Terminal },
+  { href: "/admin/firmware", label: "Firmware", long: "Firmware OTA", icon: UploadCloud, group: "Sistem" },
+  { href: "/rainfall-monitor", label: "Monitor", long: "Serial Monitor", icon: Terminal, group: "Sistem" },
 ];
+
+const NAV_GROUPS = ["Pantau", "Data & Laporan", "Sistem"].map((title) => ({
+  title,
+  items: NAV_ITEMS.filter((item) => item.group === title),
+}));
 
 // Bar bawah (HP) sudah penuh kalau memuat semua menu — ikon jadi kecil dan
 // susah dipencet tepat. Jadi hanya 4 yang paling sering dibuka yang tampil
@@ -106,51 +113,82 @@ export default function Nav() {
 
   return (
     <Fragment>
-      {/* ---------- Sidebar desktop (md ke atas): semua menu, tanpa batasan ---------- */}
-      <aside className="fixed inset-y-0 left-0 z-50 hidden w-20 flex-col items-center gap-2 border-r border-slate-200/60 bg-surface py-6 md:flex">
-        {/* Ikon AtmosX, versi terang/gelap otomatis (components/BrandLogo.tsx).
-            Latar lembut (bukan bg-slate-900): di latar gelap bagian biru tua
-            logo asli hampir tak terlihat. */}
+      {/* ---------- Sidebar desktop (md ke atas) ----------
+          Responsif dua tingkat:
+            md-lg (768-1279 px) : rail ramping 84 px, ikon + nama pendek
+            xl   (>= 1280 px)   : sidebar 240 px, ikon + nama lengkap per grup
+          Daftar menu BISA DIGULIR (flex-1 + overflow-y-auto), jadi di layar
+          laptop yang pendek (mis. 1366x768, 1280x720) tidak ada menu yang
+          terpotong; logo di atas dan tema/Telegram di bawah tetap terlihat.
+          Lebar ini harus sama dengan padding kiri di PageShell.tsx. */}
+      <aside className="fixed inset-y-0 left-0 z-50 hidden w-[84px] flex-col border-r border-slate-200/60 bg-surface md:flex xl:w-60">
+        {/* Logo */}
         <button
           type="button"
           onClick={() => goTo("/")}
-          className="mb-8 flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-50 ring-1 ring-slate-200/70 transition hover:ring-slate-300"
+          className="flex shrink-0 items-center justify-center gap-3 px-3 pb-3 pt-5 xl:justify-start xl:px-5"
           aria-label="AtmosX — Dashboard"
         >
-          <BrandLogo variant="mark" className="h-7 w-7 object-contain" />
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-50 ring-1 ring-slate-200/70 transition hover:ring-slate-300">
+            <BrandLogo variant="mark" className="h-7 w-7 object-contain" />
+          </span>
+          <span className="hidden min-w-0 text-left xl:block">
+            <span className="block text-base font-extrabold tracking-tight text-slate-900">AtmosX</span>
+            <span className="block text-[11px] text-slate-400">AWS T4T Monitoring</span>
+          </span>
         </button>
-        <nav className="flex flex-1 flex-col items-center gap-1.5">
-          {NAV_ITEMS.map((item) => {
-            const active = pathname === item.href;
-            const Icon = item.icon;
-            return (
-              <button
-                key={item.href}
-                onClick={() => goTo(item.href)}
-                title={item.label}
-                className={`group flex h-12 w-12 flex-col items-center justify-center gap-0.5 rounded-2xl transition ${
-                  active
-                    ? "bg-slate-900 text-on-strong"
-                    : "text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-                }`}
-              >
-                <Icon size={19} strokeWidth={2} />
-              </button>
-            );
-          })}
+
+        {/* Menu (bisa digulir) */}
+        <nav
+          className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto overscroll-contain px-2.5 py-2 xl:px-3"
+          style={{ scrollbarWidth: "thin" }}
+          aria-label="Navigasi utama"
+        >
+          {NAV_GROUPS.map((group, gi) => (
+            <Fragment key={group.title}>
+              {gi > 0 && <span className="mx-auto my-1.5 h-px w-8 shrink-0 bg-slate-200 xl:hidden" aria-hidden />}
+              <p className="hidden px-3 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 xl:block">
+                {group.title}
+              </p>
+              {group.items.map((item) => {
+                const active = pathname === item.href;
+                const Icon = item.icon;
+                return (
+                  <button
+                    key={item.href}
+                    onClick={() => goTo(item.href)}
+                    title={item.long}
+                    aria-current={active ? "page" : undefined}
+                    className={`group flex w-full shrink-0 flex-col items-center justify-center gap-1 rounded-2xl px-1 py-2 transition xl:flex-row xl:justify-start xl:gap-3 xl:rounded-xl xl:px-3 xl:py-2.5 ${
+                      active ? "bg-slate-900 text-on-strong shadow-sm" : "text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                    }`}
+                  >
+                    <Icon size={19} strokeWidth={2} className="shrink-0" />
+                    <span className="max-w-full truncate text-[10px] font-medium leading-none xl:hidden">{item.label}</span>
+                    <span className="hidden truncate text-sm font-medium xl:inline">{item.long}</span>
+                  </button>
+                );
+              })}
+            </Fragment>
+          ))}
+          {/* Bayangan pudar di dasar daftar: tanda bahwa menu masih bisa digulir */}
+          <div className="pointer-events-none sticky bottom-[-8px] -mt-6 h-6 shrink-0 bg-gradient-to-t from-surface to-transparent" aria-hidden />
         </nav>
 
-        <ThemeToggle variant="sidebar" />
-
-        <a
-          href={TELEGRAM_CHANNEL_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          title="Join Channel Telegram"
-          className="flex h-12 w-12 items-center justify-center rounded-2xl text-sky-500 transition hover:bg-sky-50 dark:hover:bg-sky-500/10"
-        >
-          <TelegramIcon size={19} />
-        </a>
+        {/* Bawah: tema + Telegram (selalu terlihat) */}
+        <div className="flex shrink-0 flex-col items-center gap-1 border-t border-slate-200/60 px-2.5 py-3 xl:flex-row xl:px-3">
+          <ThemeToggle variant="sidebar" />
+          <a
+            href={TELEGRAM_CHANNEL_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Join Channel Telegram"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-sky-500 transition hover:bg-sky-50 dark:hover:bg-sky-500/10 xl:h-10 xl:w-auto xl:flex-1 xl:justify-start xl:gap-3 xl:rounded-xl xl:px-3"
+          >
+            <TelegramIcon size={19} />
+            <span className="hidden text-sm font-medium xl:inline">Telegram</span>
+          </a>
+        </div>
       </aside>
 
       {/* ---------- Bar bawah (HP): 4 menu utama + "Lainnya" ---------- */}
@@ -197,7 +235,7 @@ export default function Nav() {
             className="absolute inset-0 bg-slate-900/40"
           />
           <div
-            className="absolute inset-x-0 bottom-0 rounded-t-3xl bg-surface p-4 shadow-[0_-8px_30px_rgba(15,23,42,0.15)]"
+            className="absolute inset-x-0 bottom-0 max-h-[85dvh] overflow-y-auto overscroll-contain rounded-t-3xl bg-surface p-4 shadow-[0_-8px_30px_rgba(15,23,42,0.15)]"
             style={{ paddingBottom: "calc(1.25rem + env(safe-area-inset-bottom, 0px))" }}
           >
             <div className="mb-3 flex items-center justify-between">

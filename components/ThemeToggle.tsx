@@ -23,7 +23,7 @@ export default function ThemeToggle({ variant }: { variant: "sidebar" | "sheet" 
         onClick={toggle}
         title={isDark ? "Ganti ke mode terang" : "Ganti ke mode gelap"}
         aria-label={isDark ? "Ganti ke mode terang" : "Ganti ke mode gelap"}
-        className="flex h-12 w-12 items-center justify-center rounded-2xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 xl:h-10 xl:w-10 xl:rounded-xl"
       >
         {iconBox}
       </button>
