@@ -37,6 +37,9 @@ export const LEVELS: Record<
   },
 };
 
+/** Event window untuk memilih lokasi di peta prediksi dari komponen lain. */
+export const FORECAST_SELECT_EVENT = "forecast:select";
+
 export const LEVEL_ORDER: RainLevel[] = ["kecil", "mungkin", "waspada", "besar"];
 
 export function fmt(v: number | null | undefined, digits = 1): string {

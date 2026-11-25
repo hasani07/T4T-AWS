@@ -131,14 +131,31 @@ function ScoreRow({ name, s, emphasis }: { name: string; s: ScoreView | { events
   );
 }
 
+export interface DeviceOnline {
+  weather: boolean;
+  rain: boolean;
+}
+
+function OnlineChip({ label, online }: { label: string; online: boolean }) {
+  return (
+    <span className="inline-flex items-center gap-1 text-[10px] text-slate-500">
+      <span className={`h-1.5 w-1.5 rounded-full ${online ? "bg-emerald-500" : "bg-rose-500"}`} aria-hidden />
+      {label} {online ? "online" : "offline"}
+    </span>
+  );
+}
+
 export default function ForecastPanel({
   forecast,
   onClose,
   footer,
+  online,
 }: {
   forecast: LocationForecast;
   onClose: () => void;
   footer: React.ReactNode;
+  /** Status alat di lokasi ini (opsional, dikirim dari Dashboard). */
+  online?: DeviceOnline;
 }) {
   const f = forecast;
   const level = f.rain.level ? LEVELS[f.rain.level] : null;
@@ -211,7 +228,17 @@ export default function ForecastPanel({
         </div>
 
         {/* 2. Sekarang */}
-        <Section title="Kondisi sekarang">
+        <Section
+          title="Kondisi sekarang"
+          aside={
+            online ? (
+              <span className="flex gap-2.5">
+                <OnlineChip label="Cuaca" online={online.weather} />
+                <OnlineChip label="Hujan" online={online.rain} />
+              </span>
+            ) : undefined
+          }
+        >
           <div className="grid grid-cols-4 gap-2">
             {[
               { icon: Thermometer, v: `${fmt(f.current.temp)}°`, l: "Suhu", c: "#fb923c" },

@@ -13,6 +13,10 @@ import LiveClock from "@/components/LiveClock";
 import { isDeviceOnline } from "@/lib/deviceStatus";
 import { DEVICE_COORDINATES, RAINFALL_OFFLINE_THRESHOLD_MINUTES } from "@/lib/config";
 import { Thermometer, CloudRain, Droplets, Wind, Tv } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { loadForecasts } from "@/lib/forecast/load";
+import ForecastStrip from "@/components/forecast/ForecastStrip";
+import ForecastExplorer from "@/components/forecast/ForecastExplorer";
 import Link from "next/link";
 
 // Selalu ambil data terbaru saat halaman diakses, jangan pakai cache statis
@@ -130,6 +134,21 @@ export default async function HomePage() {
       };
     });
 
+  // Prediksi dari model yang dilatih tiap malam. Dashboard TIDAK melatih
+  // langsung (supaya halaman utama tetap cepat): kalau model belum ada,
+  // bagian prediksi disembunyikan dan peta lokasi biasa yang tampil.
+  const { forecasts, modelInfo } = await loadForecasts(
+    supabase,
+    devices.map((d) => ({ id: d.id, type: d.type })),
+    { trainIfMissing: false }
+  ).catch((err) => {
+    console.error("Gagal memuat prediksi untuk dashboard:", err);
+    return { forecasts: [], modelInfo: null, setupError: null };
+  });
+  const deviceOnline = Object.fromEntries(
+    mapMarkers.map((m) => [m.id, { weather: m.weather.online, rain: m.rainfall.online }])
+  );
+
   return (
     <PageShell>
       <header className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
@@ -191,11 +210,45 @@ export default async function HomePage() {
         />
       </div>
 
+      {forecasts.length > 0 && (
+        <div className="mb-6">
+          <ForecastStrip forecasts={forecasts} modelInfo={modelInfo} />
+        </div>
+      )}
+
       <SensorCardGrid initialData={devicesWithReadings} />
 
       <div className="mt-6">
         <RainfallCardGrid devices={devices} initialData={rainfalls} />
       </div>
+
+      {/* Peta lokasi + prediksi: klik lokasi -> peta zoom in & kartu prediksi
+          lengkap meluncur masuk. Tanpa model prediksi -> peta lokasi biasa. */}
+      <section className="mt-6" aria-labelledby="map-title">
+        <div className="mb-3">
+          <h2 id="map-title" className="text-sm font-semibold text-slate-900">
+            {forecasts.length > 0 ? "Peta Lokasi & Prediksi" : "Lokasi Device"}
+          </h2>
+          {forecasts.length > 0 && (
+            <p className="mt-0.5 text-[11px] text-slate-400">
+              Klik lokasi untuk zoom in dan melihat prediksi lengkap, pola hujan, serta perbandingan dengan BMKG.
+            </p>
+          )}
+        </div>
+        {forecasts.length > 0 ? (
+          <ForecastExplorer
+            variant="embedded"
+            forecasts={forecasts}
+            modelInfo={modelInfo}
+            setupError={null}
+            deviceStatus={deviceOnline}
+          />
+        ) : (
+          <div className="relative z-0 rounded-3xl bg-surface p-5 shadow-[0_2px_24px_rgba(15,23,42,0.06)]">
+            <DeviceMap devices={mapMarkers} />
+          </div>
+        )}
+      </section>
 
       {/* Status online/offline + riwayat uptime per alat -- info lebih
           teknis/rinci, jadi ditaruh di bawah ringkasan utama, bukan di atas. */}
@@ -209,11 +262,6 @@ export default async function HomePage() {
 
       <div className="mt-6">
         <TelegramJoinCard />
-      </div>
-
-      <div className="relative z-0 rounded-3xl bg-surface p-5 shadow-[0_2px_24px_rgba(15,23,42,0.06)]">
-        <h2 className="mb-3 text-sm font-semibold text-slate-900">Lokasi Device</h2>
-        <DeviceMap devices={mapMarkers} />
       </div>
     </PageShell>
   );

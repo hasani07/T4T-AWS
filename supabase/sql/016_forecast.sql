@@ -41,14 +41,16 @@ as $$
   with wx as (
     select
       date_trunc('hour', s.created_at at time zone 'UTC') as hour,
-      avg(s.temperature)  as temp,
-      max(s.temperature)  as tmax,
-      min(s.temperature)  as tmin,
-      avg(s.humidity)     as rh,
-      avg(s.wind_speed)   as wind,
-      max(s.wind_speed)   as gust,
+      -- ::numeric -- kolom sensors bertipe double precision, sedangkan
+      -- round(nilai, digit) di Postgres hanya menerima numeric.
+      avg(s.temperature)::numeric  as temp,
+      max(s.temperature)::numeric  as tmax,
+      min(s.temperature)::numeric  as tmin,
+      avg(s.humidity)::numeric     as rh,
+      avg(s.wind_speed)::numeric   as wind,
+      max(s.wind_speed)::numeric   as gust,
       avg(0.6108 * exp(17.27 * s.temperature / (s.temperature + 237.3))
-          * (1 - s.humidity / 100.0)) as vpd,
+          * (1 - s.humidity / 100.0))::numeric as vpd,
       count(*)::int       as n
     from public.sensors s
     where s.device_id = p_device_id
@@ -63,7 +65,7 @@ as $$
   rn as (
     select
       date_trunc('hour', r.created_at at time zone 'UTC') as hour,
-      sum(r.rain_mm) as rain_mm
+      sum(r.rain_mm)::numeric as rain_mm
     from public.rainfall_readings r
     where r.device_id = p_device_id
       and r.created_at >= (p_start at time zone 'UTC')

@@ -5,20 +5,19 @@ import "leaflet/dist/leaflet.css";
 import type { Map as LeafletMap, Marker } from "leaflet";
 import { Crosshair, MapPin, Sparkles } from "lucide-react";
 import type { LocationForecast } from "@/lib/forecast/predict";
-import ForecastPanel from "./ForecastPanel";
-import { LEVELS, LEVEL_ORDER, pct } from "./levels";
+import type { ModelInfo } from "@/lib/forecast/load";
+import ForecastPanel, { DeviceOnline } from "./ForecastPanel";
+import { FORECAST_SELECT_EVENT, LEVELS, LEVEL_ORDER, pct } from "./levels";
 
-// Halaman /prediksi: peta yang "terbang" (zoom in) ke lokasi saat dipilih,
-// lalu kartu prediksi meluncur masuk di samping (desktop) atau dari bawah (HP).
+// Peta yang "terbang" (zoom in) ke lokasi saat dipilih, lalu kartu prediksi
+// meluncur masuk di samping (desktop) atau dari bawah (HP). Dipakai di:
+//   - variant "page"     : halaman /prediksi (layar penuh, dengan judul)
+//   - variant "embedded" : Dashboard (menggantikan peta "Lokasi Device")
 // Peta dimuat dinamis (Leaflet butuh window), pola sama dengan DeviceMap.
-
-export interface ModelInfo {
-  source: "malam" | "langsung" | "langsung-basi";
-  trainedAt: string;
-  dataDays: number;
-  rainEvents: number;
-  windowDays: number | null;
-}
+//
+// Komponen lain (mis. ForecastStrip di Dashboard) bisa memilih lokasi lewat
+// event window "forecast:select" (detail = deviceId): peta digulir ke layar
+// lalu terbang ke lokasi itu.
 
 const PANEL_W = 420; // lebar kartu di desktop (px), dipakai juga untuk menggeser titik fokus peta
 const EASE = "cubic-bezier(0.22,1,0.36,1)";
@@ -45,10 +44,15 @@ export default function ForecastExplorer({
   forecasts,
   modelInfo,
   setupError,
+  variant = "page",
+  deviceStatus,
 }: {
   forecasts: LocationForecast[];
   modelInfo: ModelInfo | null;
   setupError: string | null;
+  variant?: "page" | "embedded";
+  /** Status online alat cuaca & hujan per lokasi (dari Dashboard). */
+  deviceStatus?: Record<number, DeviceOnline>;
 }) {
   const stageRef = useRef<HTMLDivElement>(null);
   const mapEl = useRef<HTMLDivElement>(null);
@@ -61,6 +65,7 @@ export default function ForecastExplorer({
   const [panelVisible, setPanelVisible] = useState(false);
   const panelTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const introDone = useRef(false);
+  const [inView, setInView] = useState(false);
 
   const selected = forecasts.find((f) => f.deviceId === selectedId) ?? null;
   const reduceMotion = () =>
@@ -146,9 +151,10 @@ export default function ForecastExplorer({
     if (!selected) {
       setPanelVisible(false);
       if (introDone.current) fitAll(true);
-      else {
-        // Pembuka: peta mulai dari jauh lalu "zoom in" ke semua lokasi,
-        // diberi jeda sebentar supaya ubin peta awal sempat tampil.
+      else if (inView) {
+        // Pembuka: peta mulai dari jauh lalu "zoom in" ke semua lokasi --
+        // baru dijalankan saat peta terlihat di layar (di Dashboard letaknya
+        // di bawah), diberi jeda sebentar supaya ubin peta awal sempat tampil.
         introDone.current = true;
         panelTimer.current = setTimeout(() => fitAll(true), 450);
       }
@@ -172,7 +178,45 @@ export default function ForecastExplorer({
       panelTimer.current = setTimeout(() => setPanelVisible(true), 900);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedId, ready]);
+  }, [selectedId, ready, inView]);
+
+  // Peta terlihat di layar? (memicu animasi pembuka)
+  useEffect(() => {
+    if (!stageRef.current) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          setInView(true);
+          io.disconnect();
+        }
+      },
+      { threshold: 0.35 }
+    );
+    io.observe(stageRef.current);
+    return () => io.disconnect();
+  }, []);
+
+  // Dipilih dari luar (kartu ringkas di Dashboard): gulir ke peta, lalu terbang.
+  useEffect(() => {
+    function onSelect(e: Event) {
+      const id = Number((e as CustomEvent).detail);
+      if (!forecasts.some((f) => f.deviceId === id)) return;
+      const el = stageRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const visible = rect.top >= 0 && rect.bottom <= window.innerHeight;
+      introDone.current = true;
+      if (visible) {
+        setSelectedId(id);
+        return;
+      }
+      el.scrollIntoView({ behavior: reduceMotion() ? "auto" : "smooth", block: "center" });
+      setTimeout(() => setSelectedId(id), reduceMotion() ? 0 : 650);
+    }
+    window.addEventListener(FORECAST_SELECT_EVENT, onSelect);
+    return () => window.removeEventListener(FORECAST_SELECT_EVENT, onSelect);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [forecasts]);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -198,13 +242,13 @@ export default function ForecastExplorer({
         <Sparkles size={12} className="mr-1 inline -translate-y-px text-violet-500" />
         Model belajar sendiri dari <b className="text-slate-600">{modelInfo.dataDays} hari</b> data dua stasiun
         ({modelInfo.rainEvents} jam menjelang hujan) dan dilatih ulang tiap malam.
-        {modelInfo.source === "malam" ? <> Terakhir dilatih {trainedLabel} WIB.</> : <> Model ini dilatih langsung saat halaman dibuka.</>}
+        {modelInfo.source.startsWith("malam") ? <> Terakhir dilatih {trainedLabel} WIB.</> : <> Model ini dilatih langsung saat halaman dibuka.</>}
       </p>
       {modelInfo.source !== "malam" && (
         <p className="text-amber-700 dark:text-amber-300">
           {modelInfo.source === "langsung"
             ? "Latihan malam belum aktif — jalankan supabase/sql/017_forecast_cron.sql."
-            : "Latihan malam terakhir sudah lebih dari 36 jam lalu — cek cron forecast-train."}
+            : "Latihan malam terakhir sudah lebih dari 36 jam lalu — cek cron forecast-train di Supabase."}
         </p>
       )}
       <p>Ini peluang, bukan kepastian. Akurasi naik seiring data musim hujan bertambah.</p>
@@ -218,6 +262,7 @@ export default function ForecastExplorer({
         @media (prefers-reduced-motion: reduce) { .forecast-anim { transition: none !important; } }
       `}</style>
 
+      {variant === "page" && (
       <header className="mb-5 flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
         <div>
           <div className="flex items-center gap-2">
@@ -231,6 +276,7 @@ export default function ForecastExplorer({
           </p>
         </div>
       </header>
+      )}
 
       {setupError ? (
         <div className="rounded-3xl bg-surface p-6 text-sm text-slate-600 shadow-[0_2px_24px_rgba(15,23,42,0.06)]">
@@ -242,7 +288,11 @@ export default function ForecastExplorer({
       ) : (
         <div
           ref={stageRef}
-          className="relative h-[calc(100dvh-13rem)] min-h-[560px] overflow-hidden rounded-3xl bg-slate-100 shadow-[0_2px_24px_rgba(15,23,42,0.08)] md:h-[calc(100vh-10rem)]"
+          className={`relative overflow-hidden rounded-3xl bg-slate-100 shadow-[0_2px_24px_rgba(15,23,42,0.08)] ${
+            variant === "page"
+              ? "h-[calc(100dvh-13rem)] min-h-[560px] md:h-[calc(100vh-10rem)]"
+              : "h-[600px] md:h-[620px]"
+          }`}
         >
           <div ref={mapEl} className="absolute inset-0 z-0" />
 
@@ -308,7 +358,13 @@ export default function ForecastExplorer({
             style={{ transitionTimingFunction: EASE }}
           >
             {selected && (
-              <ForecastPanel key={selected.deviceId} forecast={selected} onClose={() => setSelectedId(null)} footer={footer} />
+              <ForecastPanel
+                key={selected.deviceId}
+                forecast={selected}
+                online={deviceStatus?.[selected.deviceId]}
+                onClose={() => setSelectedId(null)}
+                footer={footer}
+              />
             )}
           </aside>
         </div>

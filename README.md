@@ -186,7 +186,7 @@ Kolom `sensors.rainfall` adalah **peninggalan** desain lama (rencana awal: hujan
 
 | Route | Fungsi |
 |---|---|
-| `/` | 🏠 Dashboard utama — kartu realtime, status online/offline, uptime, peta |
+| `/` | 🏠 Dashboard utama — kartu prediksi 3 jam ke depan, kartu realtime, peta lokasi & prediksi (zoom in), status online/offline, uptime |
 | `/kiosk` | 📺 Mode kiosk satu-layar-penuh untuk TV/monitor tanpa penjaga |
 | `/analytics` | 📈 Tren suhu/kelembaban/angin + **grafik curah hujan terpisah** (per jam/hari, akumulasi, harian & rata-rata) |
 | `/prediksi` | 🔮 **Prediksi (preview)** — peta yang zoom ke lokasi + kartu peluang hujan & suhu 1–3 jam ke depan, dibandingkan dengan BMKG |
@@ -224,7 +224,7 @@ Kolom `sensors.rainfall` adalah **peninggalan** desain lama (rencana awal: hujan
 
 ### 4.4b Prediksi Cuaca — Model yang Belajar Sendiri
 
-📍 `lib/forecast/` · halaman `/prediksi` · cron `/api/cron/forecast-train` (01:20 WIB tiap malam)
+📍 `lib/forecast/` · tampil di **Dashboard** (kartu "Prediksi 3 Jam ke Depan" + "Peta Lokasi & Prediksi") dan layar penuh `/prediksi` · cron `/api/cron/forecast-train` (01:20 WIB tiap malam)
 
 | Yang diprediksi | Cara | Hasil uji (data 26 Okt–25 Nov 2026) |
 |---|---|---|
