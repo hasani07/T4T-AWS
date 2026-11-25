@@ -34,7 +34,7 @@ function LegendList({
  */
 export default function RainfallLegend() {
   return (
-    <details className="mt-5 rounded-3xl bg-surface px-5 py-4 shadow-[0_2px_24px_rgba(15,23,42,0.06)]">
+    <details className="mt-5 rounded-3xl bg-surface px-4 py-3.5 ring-1 ring-slate-200/60 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_28px_rgba(15,23,42,0.06)] sm:px-5 sm:py-4">
       <summary className="cursor-pointer text-sm font-medium text-slate-700">
         Standar kategori hujan (BMKG)
       </summary>

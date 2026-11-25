@@ -9,46 +9,17 @@ import { fetchDeviceRainfalls } from "@/lib/rainfall";
 import PageShell from "@/components/PageShell";
 import DeviceMap, { DeviceMapMarker } from "@/components/DeviceMap";
 import TelegramJoinCard from "@/components/TelegramJoinCard";
-import LiveClock from "@/components/LiveClock";
 import { isDeviceOnline } from "@/lib/deviceStatus";
 import { DEVICE_COORDINATES, RAINFALL_OFFLINE_THRESHOLD_MINUTES } from "@/lib/config";
-import { Thermometer, CloudRain, Droplets, Wind, Tv } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { loadForecasts } from "@/lib/forecast/load";
 import ForecastStrip from "@/components/forecast/ForecastStrip";
 import ForecastExplorer from "@/components/forecast/ForecastExplorer";
-import Link from "next/link";
+import DashboardHero, { HeroHeadline } from "@/components/DashboardHero";
+import { LEVELS } from "@/components/forecast/levels";
 
 // Selalu ambil data terbaru saat halaman diakses, jangan pakai cache statis
 export const revalidate = 0;
-
-function SummaryPill({
-  icon: Icon,
-  color,
-  value,
-  label,
-}: {
-  icon: typeof Thermometer;
-  color: string;
-  value: string;
-  label: string;
-}) {
-  return (
-    <div className="flex items-center gap-2.5 rounded-2xl bg-surface px-3 py-3 shadow-[0_2px_20px_rgba(15,23,42,0.06)] sm:gap-3 sm:px-4">
-      <span
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white sm:h-10 sm:w-10"
-        style={{ backgroundColor: color }}
-      >
-        <Icon size={16} strokeWidth={2.25} className="sm:hidden" />
-        <Icon size={18} strokeWidth={2.25} className="hidden sm:block" />
-      </span>
-      <div className="min-w-0">
-        <p className="truncate text-sm font-semibold text-slate-900">{value}</p>
-        <p className="truncate text-[11px] text-slate-400 sm:text-xs">{label}</p>
-      </div>
-    </div>
-  );
-}
 
 export default async function HomePage() {
   const devicesWithReadings = await getDevicesWithLatestReadings();
@@ -149,64 +120,45 @@ export default async function HomePage() {
     mapMarkers.map((m) => [m.id, { weather: m.weather.online, rain: m.rainfall.online }])
   );
 
+  // Status alat (cuaca & hujan dihitung terpisah: 2 alat per lokasi).
+  const alatTotal = devicesWithReadings.length * 2;
+  const alatOnline = devicesWithReadings.reduce((n, d) => {
+    const w = d.latest ? isDeviceOnline(d.latest.created_at) : false;
+    const r = rainfalls.find((x) => x.deviceId === d.id);
+    const rOn = r ? isDeviceOnline(r.lastReadingAt, RAINFALL_OFFLINE_THRESHOLD_MINUTES) : false;
+    return n + (w ? 1 : 0) + (rOn ? 1 : 0);
+  }, 0);
+
+  // Satu kalimat terpenting di bagian atas: lokasi dengan peluang hujan
+  // tertinggi dalam 3 jam ke depan (dari model prediksi).
+  let headline: HeroHeadline | null = null;
+  const top = [...forecasts]
+    .filter((f) => f.rain.prob !== null && f.rain.level)
+    .sort((a, b) => (b.rain.prob ?? 0) - (a.rain.prob ?? 0))[0];
+  if (top && top.rain.level) {
+    const pctText = `${Math.round((top.rain.prob ?? 0) * 100)}%`;
+    const name = top.label.charAt(0) + top.label.slice(1).toLowerCase();
+    headline =
+      top.rain.level === "kecil"
+        ? { tone: "ok", text: "Tidak ada tanda hujan dalam 3 jam ke depan" }
+        : {
+            tone: top.rain.level === "besar" ? "alert" : top.rain.level === "waspada" ? "warn" : "info",
+            text: `${LEVELS[top.rain.level].label} di ${name} ${top.rain.windowLabel ?? ""} (${pctText})`.replace("  ", " "),
+          };
+  }
+
   return (
     <PageShell>
-      <header className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-        {/* public/atmosx-logo.png -- logo + wordmark, menggantikan judul teks.
-            File PNG-nya SUDAH transparan (bukan kotak putih), jadi langsung
-            nyatu dengan background halaman tanpa kotak apapun di belakangnya. */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/atmosx-logo.png"
-          alt="AtmosX"
-          width={932}
-          height={722}
-          className="h-14 w-auto sm:h-16"
-        />
-        <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center">
-          {/* Mode ringkas yang geser otomatis -- cocok dipasang di layar/TV
-              tanpa ada yang menjaga, lihat app/kiosk/page.tsx (KioskView). */}
-          <Link
-            href="/kiosk"
-            className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3.5 py-2 text-xs font-medium text-slate-600 transition hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
-          >
-            <Tv size={14} strokeWidth={2.25} />
-            Mode Kiosk
-          </Link>
-          <LiveClock />
-        </div>
-      </header>
-
-      <div className="mb-6 grid grid-cols-2 gap-3 md:flex md:flex-wrap">
-        {avgTemp !== null && (
-          <SummaryPill
-            icon={Thermometer}
-            color="#FB923C"
-            value={`${avgTemp.toFixed(1)}°C`}
-            label="Rata-rata Suhu Saat Ini"
-          />
-        )}
-        {avgHumidity !== null && (
-          <SummaryPill
-            icon={Droplets}
-            color="#38BDF8"
-            value={`${avgHumidity.toFixed(0)}%`}
-            label="Rata-rata Kelembaban"
-          />
-        )}
-        {avgWind !== null && (
-          <SummaryPill
-            icon={Wind}
-            color="#A78BFA"
-            value={`${avgWind.toFixed(1)} m/s`}
-            label="Rata-rata Kecepatan Angin"
-          />
-        )}
-        <SummaryPill
-          icon={CloudRain}
-          color="#22D3EE"
-          value={rainSummaries.length > 0 ? `${totalRainfall24h.toFixed(1)} mm` : "-"}
-          label="Curah Hujan 24 Jam (Total)"
+      <div className="mb-6">
+        <DashboardHero
+          devicesOnline={alatOnline}
+          devicesTotal={alatTotal}
+          avgTemp={avgTemp}
+          avgHumidity={avgHumidity}
+          avgWind={avgWind}
+          rain24h={rainSummaries.length > 0 ? totalRainfall24h : null}
+          headline={headline}
+          locations={devicesWithReadings.map((d) => d.type.charAt(0) + d.type.slice(1).toLowerCase())}
         />
       </div>
 

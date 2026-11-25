@@ -53,8 +53,10 @@ function StripCard({ f, index }: { f: LocationForecast; index: number }) {
     <button
       type="button"
       onClick={() => window.dispatchEvent(new CustomEvent(FORECAST_SELECT_EVENT, { detail: f.deviceId }))}
-      className="group relative w-full overflow-hidden rounded-3xl bg-surface p-4 text-left shadow-[0_2px_20px_rgba(15,23,42,0.06)] outline-none ring-slate-300 transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_10px_34px_rgba(15,23,42,0.12)] focus-visible:ring-2 opacity-0 [animation:forecast-rise_650ms_cubic-bezier(0.22,1,0.36,1)_forwards] sm:p-5"
-      style={{ animationDelay: `${index * 110}ms` }}
+      className="group relative w-full overflow-hidden rounded-3xl bg-surface p-4 text-left shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_28px_rgba(15,23,42,0.06)] outline-none ring-1 ring-slate-200/60 transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_14px_38px_rgba(15,23,42,0.14)] focus-visible:ring-2 focus-visible:ring-slate-400 sm:p-5"
+      // Animasi masuk lewat style langsung (bukan kelas arbitrer Tailwind)
+      // supaya pasti jalan; `both` = tetap tak terlihat sampai giliran mulai.
+      style={{ animation: `forecast-rise 650ms cubic-bezier(0.22,1,0.36,1) ${index * 110}ms both` }}
       aria-label={`${f.label}: peluang hujan ${f.rain.prob !== null ? Math.round(f.rain.prob * 100) : "-"} persen. Buka di peta.`}
     >
       {/* Rona warna tingkat peluang */}

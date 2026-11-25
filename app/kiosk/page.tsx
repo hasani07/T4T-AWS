@@ -2,6 +2,8 @@ import { getDevicesWithLatestReadings } from "@/lib/devices";
 import { fetchDeviceRainfalls } from "@/lib/rainfall";
 import { DeviceRainfall } from "@/lib/types";
 import KioskView from "@/components/kiosk/KioskView";
+import { supabase } from "@/lib/supabase";
+import { loadForecasts } from "@/lib/forecast/load";
 
 // Selalu ambil data terbaru saat halaman dibuka (kiosk biasanya dibuka
 // sekali lalu dibiarkan menyala terus -- data berikutnya di-refresh sendiri
@@ -31,5 +33,14 @@ export default async function KioskPage() {
     rainfalls = deviceIds.map((id) => ({ deviceId: id, summary: null, lastReadingAt: null }));
   }
 
-  return <KioskView initialDevices={devicesWithReadings} initialRainfalls={rainfalls} />;
+  // Prediksi 3 jam (model latihan malam; tidak melatih di sini). Gagal -> kosong.
+  const { forecasts } = await loadForecasts(
+    supabase,
+    devicesWithReadings.map((d) => ({ id: d.id, type: d.type })),
+    { trainIfMissing: false }
+  ).catch(() => ({ forecasts: [] }));
+
+  return (
+    <KioskView initialDevices={devicesWithReadings} initialRainfalls={rainfalls} initialForecasts={forecasts} />
+  );
 }

@@ -250,7 +250,7 @@ export default function DeviceUptimePanel({ devices }: { devices: Device[] }) {
   if (devices.length === 0) return null;
 
   return (
-    <div className="mb-6 rounded-3xl bg-surface p-5 shadow-[0_2px_24px_rgba(15,23,42,0.06)]">
+    <div className="mb-6 rounded-3xl bg-surface p-4 ring-1 ring-slate-200/60 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_28px_rgba(15,23,42,0.06)] sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-sm font-semibold text-slate-900">Uptime Perangkat</h2>
         <div className="inline-flex rounded-full bg-slate-100 p-0.5" role="group" aria-label="Periode uptime">

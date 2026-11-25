@@ -100,7 +100,7 @@ export default function DeviceStatusOverview({
       : "bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300";
 
   return (
-    <div className="mb-6 rounded-3xl bg-surface p-5 shadow-[0_2px_24px_rgba(15,23,42,0.06)]">
+    <div className="mb-6 rounded-3xl bg-surface p-4 ring-1 ring-slate-200/60 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_28px_rgba(15,23,42,0.06)] sm:p-5">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold text-slate-900">Status Perangkat</h2>
         <span
@@ -121,7 +121,7 @@ export default function DeviceStatusOverview({
             >
               <div className="flex min-w-0 items-center gap-3">
                 <span
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white"
                   style={{ backgroundColor: color }}
                 >
                   <Icon size={15} strokeWidth={2.25} />

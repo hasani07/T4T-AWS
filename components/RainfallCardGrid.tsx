@@ -64,7 +64,7 @@ export default function RainfallCardGrid({
     <div>
       <h2 className="mb-3 text-sm font-semibold text-slate-900">Curah Hujan</h2>
 
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:gap-5 lg:grid-cols-2">
         {devices.map((device) => (
           // id ini dituju oleh link "Lihat kartu hujan" di popup peta Lokasi
           // Device (components/DeviceMap.tsx) -- scroll-margin-top supaya

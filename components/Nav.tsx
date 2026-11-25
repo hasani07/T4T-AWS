@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useNavigationProgress } from "./NavigationProgress";
 import ThemeToggle from "./ThemeToggle";
+import BrandLogo from "./BrandLogo";
 
 const NAV_ITEMS = [
   // "/" adalah Dashboard lengkap (beranda, lihat app/page.tsx). Mode Kiosk
@@ -107,11 +108,17 @@ export default function Nav() {
     <Fragment>
       {/* ---------- Sidebar desktop (md ke atas): semua menu, tanpa batasan ---------- */}
       <aside className="fixed inset-y-0 left-0 z-50 hidden w-20 flex-col items-center gap-2 border-r border-slate-200/60 bg-surface py-6 md:flex">
-        {/* public/t4t-logo.png -- logo (ikon "X"), latar transparan. */}
-        <div className="mb-8 flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-900">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/t4t-logo.png" alt="Logo" width={28} height={28} className="h-7 w-7 object-contain" />
-        </div>
+        {/* Ikon AtmosX, versi terang/gelap otomatis (components/BrandLogo.tsx).
+            Latar lembut (bukan bg-slate-900): di latar gelap bagian biru tua
+            logo asli hampir tak terlihat. */}
+        <button
+          type="button"
+          onClick={() => goTo("/")}
+          className="mb-8 flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-50 ring-1 ring-slate-200/70 transition hover:ring-slate-300"
+          aria-label="AtmosX — Dashboard"
+        >
+          <BrandLogo variant="mark" className="h-7 w-7 object-contain" />
+        </button>
         <nav className="flex flex-1 flex-col items-center gap-1.5">
           {NAV_ITEMS.map((item) => {
             const active = pathname === item.href;

@@ -21,7 +21,7 @@ function EmptyChart() {
 /** Grafik garis (dipakai untuk tren suhu). Titik yang null (tidak ada
  * pembacaan di jendela itu) memutus garis -- tidak disambung lurus --
  * supaya jeda waktu tanpa data tidak terlihat seolah ada trennya. */
-export function MiniLineChart({ points, color }: { points: TrendPoint[]; color: string }) {
+export function MiniLineChart({ points, color, fill = false }: { points: TrendPoint[]; color: string; fill?: boolean }) {
   const known = points.filter((p): p is TrendPoint & { value: number } => p.value !== null);
   if (known.length < 2) return <EmptyChart />;
 
@@ -51,8 +51,9 @@ export function MiniLineChart({ points, color }: { points: TrendPoint[]; color: 
   const last = known[known.length - 1];
 
   return (
-    <div className="flex w-full flex-1 flex-col items-center justify-center gap-1.5">
-      <div className="h-28 w-full sm:h-36 lg:h-48">
+    // fill: grafik mengisi sisa tinggi wadahnya (dipakai di kolom samping kiosk)
+    <div className={`flex w-full flex-1 flex-col items-center justify-center gap-1.5 ${fill ? "min-h-0" : ""}`}>
+      <div className={fill ? "min-h-[90px] w-full flex-1" : "h-28 w-full sm:h-36 lg:h-48"}>
         <svg
           width="100%"
           height="100%"
@@ -73,7 +74,7 @@ export function MiniLineChart({ points, color }: { points: TrendPoint[]; color: 
           ))}
         </svg>
       </div>
-      <p className="text-sm text-slate-400 sm:text-base">
+      <p className="text-xs text-slate-400 lg:text-[clamp(0.75rem,1.5vh,1rem)]">
         {points[0]?.label}–{points[n - 1]?.label} WIB · terakhir {last.value.toFixed(1)}
       </p>
     </div>
@@ -83,7 +84,7 @@ export function MiniLineChart({ points, color }: { points: TrendPoint[]; color: 
 /** Grafik batang (dipakai untuk tren hujan per jam). Batang 0mm tetap
  * digambar tipis/transparan supaya jam itu kelihatan "memang tidak hujan",
  * bukan hilang dari grafik. */
-export function MiniBarChart({ points, color }: { points: TrendPoint[]; color: string }) {
+export function MiniBarChart({ points, color, fill = false }: { points: TrendPoint[]; color: string; fill?: boolean }) {
   if (points.length === 0) return <EmptyChart />;
 
   const values = points.map((p) => p.value ?? 0);
@@ -95,8 +96,9 @@ export function MiniBarChart({ points, color }: { points: TrendPoint[]; color: s
   const barWidth = Math.max(2, innerW / n - barGap);
 
   return (
-    <div className="flex w-full flex-1 flex-col items-center justify-center gap-1.5">
-      <div className="h-28 w-full sm:h-36 lg:h-48">
+    // fill: grafik mengisi sisa tinggi wadahnya (dipakai di kolom samping kiosk)
+    <div className={`flex w-full flex-1 flex-col items-center justify-center gap-1.5 ${fill ? "min-h-0" : ""}`}>
+      <div className={fill ? "min-h-[90px] w-full flex-1" : "h-28 w-full sm:h-36 lg:h-48"}>
         <svg
           width="100%"
           height="100%"
@@ -123,7 +125,7 @@ export function MiniBarChart({ points, color }: { points: TrendPoint[]; color: s
           })}
         </svg>
       </div>
-      <p className="text-sm text-slate-400 sm:text-base">
+      <p className="text-xs text-slate-400 lg:text-[clamp(0.75rem,1.5vh,1rem)]">
         {points[0]?.label}–{points[n - 1]?.label} WIB
       </p>
     </div>

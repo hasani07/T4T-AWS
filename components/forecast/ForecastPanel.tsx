@@ -262,8 +262,8 @@ export default function ForecastPanel({
               {f.hours.map((h, i) => (
                 <div
                   key={h.hourKey}
-                  className="rounded-2xl border border-slate-200/80 px-3 py-3 opacity-0 [animation:forecast-rise_600ms_cubic-bezier(0.22,1,0.36,1)_forwards]"
-                  style={{ animationDelay: `${350 + i * 90}ms` }}
+                  className="rounded-2xl border border-slate-200/80 px-3 py-3"
+                  style={{ animation: `forecast-rise 600ms cubic-bezier(0.22,1,0.36,1) ${350 + i * 90}ms both` }}
                 >
                   <p className="text-[11px] font-semibold text-slate-500">{h.label}</p>
                   <p className="mt-1 flex items-center gap-1 text-lg font-bold text-slate-900">
