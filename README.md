@@ -189,6 +189,7 @@ Kolom `sensors.rainfall` adalah **peninggalan** desain lama (rencana awal: hujan
 | `/` | 🏠 Dashboard utama — kartu realtime, status online/offline, uptime, peta |
 | `/kiosk` | 📺 Mode kiosk satu-layar-penuh untuk TV/monitor tanpa penjaga |
 | `/analytics` | 📈 Tren suhu/kelembaban/angin + **grafik curah hujan terpisah** (per jam/hari, akumulasi, harian & rata-rata) |
+| `/prediksi` | 🔮 **Prediksi (preview)** — peta yang zoom ke lokasi + kartu peluang hujan & suhu 1–3 jam ke depan, dibandingkan dengan BMKG |
 | `/recommendations` | 🤖 Rekomendasi AI (VPD, risiko, narasi Groq) |
 | `/reports` | 📨 Riwayat & generate manual laporan mingguan Telegram |
 | `/download` | ⬇️ Laporan Excel cuaca, **curah hujan khusus**: Excel dengan grafik (per hari / per jam) atau CSV (per hari / per jam / mentah), CSV cuaca mentah |
@@ -220,6 +221,21 @@ Kolom `sensors.rainfall` adalah **peninggalan** desain lama (rencana awal: hujan
 |---|---|
 | **VPD** (Vapor Pressure Deficit) | Rumus Magnus dari suhu & kelembaban → rendah (<0,8 kPa) / sedang (0,8–1,5) / tinggi (>1,5) |
 | **Level risiko** | 🔴 Kritis: suhu >33°C **dan** kelembaban <55% · 🟡 Waspada: suhu >32°C **atau** kelembaban <60% · angin kuat (>8 m/s) + suhu >30°C menaikkan level satu tingkat |
+
+### 4.4b Prediksi Cuaca — Model yang Belajar Sendiri
+
+📍 `lib/forecast/` · halaman `/prediksi` · cron `/api/cron/forecast-train` (01:20 WIB tiap malam)
+
+| Yang diprediksi | Cara | Hasil uji (data 26 Okt–25 Nov 2026) |
+|---|---|---|
+| Peluang hujan ≥0,5 mm dalam 3 jam ke depan | Regresi logistik dari perubahan suhu, kelembaban, angin, hujan terakhir & jam | Skor peluang (Brier) 0,098 vs 0,106 pola jam; AUC 0,89 |
+| Suhu & kelembaban +1, +2, +3 jam | Pola perubahan biasa per jam (atau ridge, mana yang menang) | Suhu ±0,9°C (1 jam) – ±1,7°C (3 jam); RH ±5% (3 jam) |
+
+- **Belajar tiap malam:** seluruh riwayat per jam diambil lewat fungsi SQL `forecast_hourly()`, model dilatih ulang, lalu disimpan ke tabel `forecast_models` (JSON, ~16 KB).
+- **Uji jujur:** tiap malam model diuji ala produksi pada 7 hari terakhir (dilatih hanya dari data sebelum hari yang ditebak). Model hanya dipakai bila skornya **lebih baik dari pola jam**; pilihan data latih (semua data vs 60 hari terakhir) juga dipilih otomatis dengan cara yang sama.
+- **Dibandingkan dengan BMKG** di slot 3 jam yang sama (`bmkg_snapshots`), ditampilkan di kartu "Seberapa tepat?".
+- Kalau cron belum aktif / model basi (>36 jam), halaman melatih langsung saat dibuka (tidak disimpan).
+- Batasan: belum bisa memprediksi jumlah mm, hujan besok/lusa, atau hari kering panjang. 98% hujan di dua lokasi turun pukul 13–21 WIB, jadi pola jam sudah kuat; model menambah dengan membaca kondisi saat ini. Sensor tekanan udara (BME280) akan menaikkan akurasi.
 
 ### 4.5 Skema Database Aktual
 
@@ -276,6 +292,7 @@ Semua tabel baru: RLS `anon` boleh `insert` (alat) + `select` (dashboard), **tid
 - 🔴 **Dashboard realtime** — update live tanpa reload
 - 📺 **Mode Kiosk** — satu layar penuh, kolom otomatis menyesuaikan jumlah device
 - 📈 **Analitik** historis per rentang waktu — curah hujan punya 3 grafik sendiri (per jam/hari, akumulasi, harian + garis rata-rata)
+- 🔮 **Prediksi cuaca (preview)** — peluang hujan & suhu 1–3 jam ke depan per lokasi, model dilatih ulang tiap malam, dibandingkan dengan BMKG (lihat §4.4b)
 - 🤖 **Rekomendasi AI** — rule engine + narasi Groq
 - 📨 **Laporan mingguan Telegram** — otomatis + manual, chart + statistik + rekomendasi
 - 💬 **Command Telegram** (`/laporan`) on-demand
@@ -316,7 +333,7 @@ Semua tabel baru: RLS `anon` boleh `insert` (alat) + `select` (dashboard), **tid
 |---|---|
 | **Web (Next.js)** | Push ke Vercel — otomatis build & deploy. `vercel.json` sengaja `"crons": []`; semua penjadwalan dipindah ke **pg_cron Supabase** (lebih andal, tidak kena limit Vercel Cron) |
 | **Edge Functions** | Deploy manual per function ke Supabase (`supabase/functions/<nama>/index.ts`) via CLI/dashboard |
-| **Migrasi SQL** | Jalankan berurutan di Supabase SQL Editor, `001_...sql` → `015_...sql`, masing-masing idempotent |
+| **Migrasi SQL** | Jalankan berurutan di Supabase SQL Editor, `001_...sql` → `017_...sql`, masing-masing idempotent (016–017 = prediksi cuaca) |
 | **Env vars (server-only)** | Supabase URL & key, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, Groq API key — hanya di secrets Vercel/Supabase, tidak pernah di-bundle ke client |
 
 ---
@@ -352,7 +369,7 @@ Dicatat supaya tidak terulang:
 | Konstanta operasional aktual | `lib/config.ts` |
 | Logic rule engine AI | `lib/rules/ruleEngine.ts` |
 | Tipe data TypeScript lengkap | `lib/types.ts` |
-| Skema SQL lengkap (kronologis) | `supabase/sql/001_...sql` – `015_...sql` |
+| Skema SQL lengkap (kronologis) | `supabase/sql/001_...sql` – `017_...sql` |
 | Firmware rain gauge | `Firmware Rainfall Cisangkuy.ino`, `...Ciminyak.ino` |
 
 <div align="center">

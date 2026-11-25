@@ -16,6 +16,7 @@ import {
   MoreHorizontal,
   Tv,
   X,
+  CloudRain,
 } from "lucide-react";
 import { useNavigationProgress } from "./NavigationProgress";
 import ThemeToggle from "./ThemeToggle";
@@ -28,6 +29,8 @@ const NAV_ITEMS = [
   { href: "/", label: "Dashboard", icon: LayoutGrid },
   { href: "/kiosk", label: "Kiosk", icon: Tv },
   { href: "/analytics", label: "Analitik", icon: BarChart3 },
+  // Preview: peta yang zoom ke lokasi + kartu prediksi hujan/suhu 1-3 jam.
+  { href: "/prediksi", label: "Prediksi", icon: CloudRain },
   { href: "/bmkg", label: "BMKG", icon: CloudSun },
   { href: "/kuota", label: "Kuota", icon: Smartphone },
   { href: "/download", label: "Unduh", icon: Download },
