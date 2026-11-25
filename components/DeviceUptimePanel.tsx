@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Thermometer, CloudRain } from "lucide-react";
+import { Thermometer, CloudRain, Activity } from "lucide-react";
 import { Device } from "@/lib/types";
 import {
   OFFLINE_THRESHOLD_MINUTES,
@@ -39,12 +39,6 @@ const TONE_TEXT: Record<UptimeTone, string> = {
   bad: "text-rose-700 dark:text-rose-300",
   none: "text-slate-400",
 };
-const TONE_BAR: Record<UptimeTone, string> = {
-  good: "bg-emerald-500",
-  warn: "bg-amber-500",
-  bad: "bg-rose-500",
-  none: "bg-slate-300",
-};
 const TONE_LABEL: Record<UptimeTone, string> = {
   good: "Sangat baik",
   warn: "Cukup",
@@ -64,9 +58,73 @@ function fmtPct(v: number | null): string {
   return v === null ? "-" : `${v.toFixed(1)}%`;
 }
 
+const TONE_HEX: Record<UptimeTone, string> = { good: "#10B981", warn: "#F59E0B", bad: "#F43F5E", none: "#94A3B8" };
+
+/** Cincin persentase uptime. */
+function Ring({ pct, tone }: { pct: number | null; tone: UptimeTone }) {
+  const r = 26;
+  const c = 2 * Math.PI * r;
+  const p = pct === null ? 0 : Math.max(0, Math.min(100, pct)) / 100;
+  return (
+    <div className="relative h-[68px] w-[68px] shrink-0">
+      <svg viewBox="0 0 64 64" className="h-full w-full -rotate-90" aria-hidden>
+        <circle cx="32" cy="32" r={r} fill="none" className="stroke-slate-200" strokeWidth="6" />
+        <circle
+          cx="32"
+          cy="32"
+          r={r}
+          fill="none"
+          stroke={TONE_HEX[tone]}
+          strokeWidth="6"
+          strokeLinecap="round"
+          strokeDasharray={c}
+          strokeDashoffset={c * (1 - p)}
+          style={{ transition: "stroke-dashoffset 900ms cubic-bezier(0.22,1,0.36,1)" }}
+        />
+      </svg>
+      <span className={`absolute inset-0 flex items-center justify-center text-[13px] font-extrabold tabular-nums ${TONE_TEXT[tone]}`}>
+        {pct === null ? "–" : pct >= 99.95 ? "100%" : `${pct.toFixed(1)}%`}
+      </span>
+    </div>
+  );
+}
+
+/** Garis waktu jendela uptime: merah = saat perangkat offline. */
+function OutageTimeline({ data }: { data: DeviceUptime }) {
+  const t0 = Date.parse(data.windowStart + "Z");
+  const t1 = Date.parse(data.windowEnd + "Z");
+  const span = t1 - t0;
+  if (!(span > 0)) return null;
+  const segs = data.recentOutages
+    .map((o) => {
+      const a = Math.max(t0, Date.parse(o.start + "Z"));
+      const b = Math.min(t1, Date.parse(o.end + "Z"));
+      return { left: ((a - t0) / span) * 100, width: Math.max(0.6, ((b - a) / span) * 100), o };
+    })
+    .filter((x) => x.width > 0 && Number.isFinite(x.left));
+  return (
+    <div>
+      <div className="relative h-3 overflow-hidden rounded-full bg-emerald-500/80" role="img" aria-label="Garis waktu gangguan">
+        {segs.map((sg, i) => (
+          <span
+            key={i}
+            className={`absolute inset-y-0 ${sg.o.ongoing ? "animate-pulse bg-rose-500" : "bg-rose-500"}`}
+            style={{ left: `${sg.left}%`, width: `${sg.width}%` }}
+            title={`${formatWallClock(sg.o.start)} – ${sg.o.ongoing ? "sekarang" : formatWallClock(sg.o.end)} (${formatSpan(sg.o.seconds)})`}
+          />
+        ))}
+      </div>
+      <div className="mt-1 flex justify-between text-[10px] tabular-nums text-slate-400">
+        <span>{formatWallClock(data.windowStart)}</span>
+        <span>sekarang</span>
+      </div>
+    </div>
+  );
+}
+
 function UptimeItem({ item, state, period }: { item: Item; state: ItemState | undefined; period: UptimePeriod }) {
   const Icon = item.kind === "weather" ? Thermometer : CloudRain;
-  const color = item.kind === "weather" ? "#FB923C" : "#22D3EE";
+  const color = item.kind === "weather" ? "#F97316" : "#06B6D4";
 
   const data = state?.status === "ok" ? state.data : null;
   // Belum ada data yang bisa dihitung (mis. perangkat belum pernah kirim):
@@ -79,28 +137,26 @@ function UptimeItem({ item, state, period }: { item: Item; state: ItemState | un
     data !== null && Date.parse(data.windowStart + "Z") - Date.parse(requestedStart + "Z") > 5 * 60 * 1000;
 
   return (
-    <li className="rounded-2xl bg-slate-50 p-4">
-      <div className="flex items-start justify-between gap-3">
+    <li className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200/50">
+      <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <span
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white"
-            style={{ backgroundColor: color }}
-          >
-            <Icon size={15} strokeWidth={2.25} />
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white" style={{ background: `linear-gradient(135deg, ${color}, ${color}cc)` }}>
+            <Icon size={16} strokeWidth={2.25} aria-hidden />
           </span>
-          <p className="truncate text-sm font-medium text-slate-900">
-            {item.label} · {item.location}
-          </p>
-        </div>
-        {data && (
-          <div className="shrink-0 text-right">
-            <p className={`text-xl font-semibold tabular-nums ${TONE_TEXT[tone]}`}>{fmtPct(data.uptimePct)}</p>
-            <p className={`text-[11px] ${TONE_TEXT[tone]}`}>{TONE_LABEL[tone]}</p>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-slate-900">{item.label}</p>
+            <p className="truncate text-[11px] text-slate-400">{item.location}</p>
           </div>
-        )}
+        </div>
+        {data && hasStats ? (
+          <div className="flex items-center gap-2">
+            <span className={`hidden text-right text-[11px] font-semibold sm:block ${TONE_TEXT[tone]}`}>{TONE_LABEL[tone]}</span>
+            <Ring pct={data.uptimePct} tone={tone} />
+          </div>
+        ) : null}
       </div>
 
-      {!state && <p className="mt-3 text-xs text-slate-400">Memuat...</p>}
+      {!state && <div className="mt-3 h-16 animate-pulse rounded-xl bg-slate-100" />}
 
       {state?.status === "error" && (
         <p className="mt-3 rounded-xl bg-rose-50 dark:bg-rose-500/10 p-2.5 text-xs text-rose-700 dark:text-rose-300">
@@ -116,59 +172,57 @@ function UptimeItem({ item, state, period }: { item: Item; state: ItemState | un
 
       {data && hasStats && (
         <>
-          <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-slate-200">
-            <div
-              className={`h-full rounded-full ${TONE_BAR[tone]}`}
-              style={{ width: `${data.uptimePct ?? 0}%` }}
-            />
+          <div className="mt-3">
+            <OutageTimeline data={data} />
           </div>
 
-          <div className="mt-3 space-y-1 text-xs text-slate-500">
-            <p>
-              Data masuk:{" "}
-              <b className="tabular-nums text-slate-700">
-                {data.readings.toLocaleString("id-ID")} dari {data.expectedReadings.toLocaleString("id-ID")}
-              </b>{" "}
-              ({fmtPct(data.completenessPct)})
-            </p>
-            {data.outageCount === 0 ? (
-              <p>
-                Gangguan: <b className="text-slate-700">tidak ada</b>
-              </p>
-            ) : (
-              <p>
-                Gangguan: <b className="text-slate-700">{data.outageCount}x</b> · total{" "}
-                <b className="text-slate-700">{formatSpan(data.downSeconds)}</b> · terlama{" "}
-                <b className="text-slate-700">{formatSpan(data.longestOutageSeconds)}</b>
-              </p>
-            )}
-            {startedLater && (
-              <p className="text-slate-400">
-                Dihitung sejak data pertama: {formatWallClock(data.windowStart)} WIB
-              </p>
-            )}
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            <div className="rounded-xl bg-surface px-2.5 py-2 ring-1 ring-slate-200/50">
+              <p className="text-[10px] text-slate-400">Gangguan</p>
+              <p className="text-sm font-bold tabular-nums text-slate-900">{data.outageCount === 0 ? "Tidak ada" : `${data.outageCount}x`}</p>
+            </div>
+            <div className="rounded-xl bg-surface px-2.5 py-2 ring-1 ring-slate-200/50">
+              <p className="text-[10px] text-slate-400">Total mati</p>
+              <p className="text-sm font-bold tabular-nums text-slate-900">{data.outageCount === 0 ? "–" : formatSpan(data.downSeconds)}</p>
+            </div>
+            <div className="rounded-xl bg-surface px-2.5 py-2 ring-1 ring-slate-200/50">
+              <p className="text-[10px] text-slate-400">Terlama</p>
+              <p className="text-sm font-bold tabular-nums text-slate-900">{data.outageCount === 0 ? "–" : formatSpan(data.longestOutageSeconds)}</p>
+            </div>
           </div>
+
+          <div className="mt-3">
+            <div className="flex items-baseline justify-between text-[11px] text-slate-500">
+              <span>Kelengkapan data</span>
+              <span className="tabular-nums">
+                <b className="text-slate-800">{fmtPct(data.completenessPct)}</b> · {data.readings.toLocaleString("id-ID")}/
+                {data.expectedReadings.toLocaleString("id-ID")}
+              </span>
+            </div>
+            <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-200">
+              <div className="h-full rounded-full bg-sky-500" style={{ width: `${data.completenessPct ?? 0}%` }} />
+            </div>
+          </div>
+
+          {startedLater && (
+            <p className="mt-2 text-[11px] text-slate-400">Dihitung sejak data pertama: {formatWallClock(data.windowStart)} WIB</p>
+          )}
 
           {data.recentOutages.length > 0 && (
             <details className="mt-2 text-xs text-slate-500">
-              <summary className="cursor-pointer select-none text-slate-500">
-                Gangguan terbaru ({data.recentOutages.length}
+              <summary className="cursor-pointer select-none font-medium text-slate-600">
+                Rincian gangguan ({data.recentOutages.length}
                 {data.outageCount > data.recentOutages.length ? ` dari ${data.outageCount}` : ""})
               </summary>
-              {/* Tinggi dibatasi (~7 baris) dan bisa di-scroll, supaya panel tidak
-                  memanjang ke bawah walau gangguannya banyak. */}
+              {/* Tinggi dibatasi dan bisa di-scroll, supaya panel tidak memanjang. */}
               <ul className="mt-2 max-h-40 space-y-1 overflow-y-auto pr-1">
                 {data.recentOutages.map((o) => (
-                  <li key={o.start} className="flex flex-wrap justify-between gap-x-3 tabular-nums">
+                  <li key={o.start} className="flex flex-wrap justify-between gap-x-3 rounded-lg bg-surface px-2.5 py-1.5 tabular-nums ring-1 ring-slate-200/40">
                     <span>
                       {formatWallClock(o.start)} –{" "}
-                      {o.ongoing ? (
-                        <b className="text-rose-600 dark:text-rose-400">sedang berlangsung</b>
-                      ) : (
-                        formatWallClock(o.end)
-                      )}
+                      {o.ongoing ? <b className="text-rose-600 dark:text-rose-400">sedang berlangsung</b> : formatWallClock(o.end)}
                     </span>
-                    <span className="text-slate-700">{formatSpan(o.seconds)}</span>
+                    <span className="font-semibold text-slate-700">{formatSpan(o.seconds)}</span>
                   </li>
                 ))}
               </ul>
@@ -252,7 +306,15 @@ export default function DeviceUptimePanel({ devices }: { devices: Device[] }) {
   return (
     <div className="mb-6 rounded-3xl bg-surface p-4 ring-1 ring-slate-200/60 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_28px_rgba(15,23,42,0.06)] sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-sm font-semibold text-slate-900">Uptime Perangkat</h2>
+        <div className="flex items-center gap-3">
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl text-white" style={{ background: "linear-gradient(135deg,#6366F1,#6366F1cc)", boxShadow: "0 6px 16px #6366F140" }}>
+            <Activity size={18} strokeWidth={2.25} aria-hidden />
+          </span>
+          <div>
+            <h2 className="text-base font-bold tracking-tight text-slate-900">Uptime Perangkat</h2>
+            <p className="text-[11px] text-slate-400">Seberapa sering tiap alat aktif & mengirim data</p>
+          </div>
+        </div>
         <div className="inline-flex rounded-full bg-slate-100 p-0.5" role="group" aria-label="Periode uptime">
           {UPTIME_PERIODS.map((p) => (
             <button
@@ -260,8 +322,8 @@ export default function DeviceUptimePanel({ devices }: { devices: Device[] }) {
               type="button"
               onClick={() => setPeriod(p.value)}
               aria-pressed={period === p.value}
-              className={`rounded-full px-3 py-1 text-xs font-medium transition ${
-                period === p.value ? "bg-surface text-slate-900 shadow-sm dark:bg-slate-200" : "text-slate-500"
+              className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                period === p.value ? "bg-surface text-slate-900 shadow-sm ring-1 ring-slate-200/70" : "text-slate-500 hover:text-slate-800"
               }`}
             >
               {p.label}
@@ -270,13 +332,17 @@ export default function DeviceUptimePanel({ devices }: { devices: Device[] }) {
         </div>
       </div>
 
-      <ul className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <ul className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
         {items.map((item) => (
           <UptimeItem key={item.key} item={item} state={results[`${period}:${item.key}`]} period={period} />
         ))}
       </ul>
 
-      <p className="mt-3 text-[11px] leading-relaxed text-slate-400">
+      <p className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500">
+        <span className="flex items-center gap-1.5"><span className="h-2 w-4 rounded-full bg-emerald-500/80" /> aktif</span>
+        <span className="flex items-center gap-1.5"><span className="h-2 w-4 rounded-full bg-rose-500" /> offline</span>
+      </p>
+      <p className="mt-2 text-[11px] leading-relaxed text-slate-400">
         Uptime = persentase waktu perangkat tidak berstatus Offline (Offline = tidak ada data baru lebih dari{" "}
         {OFFLINE_THRESHOLD_MINUTES} menit, sama dengan badge di atas). Data masuk = jumlah baris dibanding
         1 baris per menit; angka ini menangkap perangkat yang sering telat kirim sebentar-sebentar walau tidak

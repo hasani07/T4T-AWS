@@ -1,15 +1,33 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { MapPin, RefreshCw } from "lucide-react";
 import { Device } from "@/lib/types";
 import { PeriodPreset, getPeriodRange, getPreviousRange } from "@/lib/dateRange";
 import { computeStats, fetchReadings, PeriodStats } from "@/lib/statsEngine";
 import { fetchRainfallBuckets, fetchRainfallTotal, RainBucket } from "@/lib/rainfall";
 import PeriodSelector from "./PeriodSelector";
-import StatsSummary from "./StatsSummary";
-import TrendChart from "./TrendChart";
 import RainfallCharts from "./RainfallCharts";
 import LocationComparison from "./LocationComparison";
+import {
+  DailyRanges,
+  DiurnalCard,
+  InsightsPanel,
+  KpiCards,
+  MetricTrends,
+  VpdCard,
+  WindRoseCard,
+} from "./sections";
+import {
+  buildInsights,
+  dailySeries,
+  diurnalProfile,
+  hourlySeries,
+  shareWhere,
+  vpdShare,
+  windRose,
+} from "@/lib/analyticsCalc";
+import { CARD } from "@/components/ui/card";
 
 const AUTO_REFRESH_INTERVAL_MS = 2 * 60 * 1000; // 2 menit
 
@@ -105,6 +123,28 @@ export default function AnalyticsClient({ devices }: { devices: Device[] }) {
     return () => clearInterval(interval);
   }, [loadData]);
 
+  // Turunan untuk grafik & insight (dihitung sekali per data baru).
+  const derived = useMemo(() => {
+    if (!currentStats) return null;
+    const series = currentStats.series;
+    const daily = dailySeries(series);
+    const diurnal = diurnalProfile(series);
+    const vpd = vpdShare(series);
+    const humid90Pct = shareWhere(series, (r) => r.humidity >= 90);
+    return {
+      daily,
+      diurnal,
+      vpd,
+      humid90Pct,
+      hot32Pct: shareWhere(series, (r) => r.temperature > 32),
+      hourly: hourlySeries(series),
+      rose: windRose(series),
+      insights: buildInsights({ current: currentStats, previous: previousStats, daily, diurnal, rainDaily, vpd, humid90Pct }),
+    };
+  }, [currentStats, previousStats, rainDaily]);
+
+  const selectedLabel = devices.find((d) => d.id === deviceId)?.type ?? "";
+
   if (devices.length === 0) {
     return (
       <p className="text-sm text-slate-500">
@@ -115,20 +155,26 @@ export default function AnalyticsClient({ devices }: { devices: Device[] }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex flex-wrap items-center gap-4">
-          <select
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-            value={deviceId ?? ""}
-            onChange={(e) => setDeviceId(Number(e.target.value))}
-          >
-            {devices.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.type}
-              </option>
-            ))}
-          </select>
+      <style>{`@keyframes analytics-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }`}</style>
 
+      {/* Toolbar: lokasi + periode + segarkan */}
+      <div className={`${CARD} flex flex-col gap-3 p-3 sm:p-4 lg:flex-row lg:items-center lg:justify-between`}>
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+          <div className="inline-flex w-full rounded-2xl bg-slate-100 p-1 sm:w-auto" role="group" aria-label="Pilih lokasi">
+            {devices.map((d) => (
+              <button
+                key={d.id}
+                onClick={() => setDeviceId(d.id)}
+                aria-pressed={deviceId === d.id}
+                className={`flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold transition sm:flex-none ${
+                  deviceId === d.id ? "bg-surface text-slate-900 shadow-sm ring-1 ring-slate-200/70" : "text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                <MapPin size={13} aria-hidden />
+                {d.type}
+              </button>
+            ))}
+          </div>
           <PeriodSelector
             preset={preset}
             onPresetChange={setPreset}
@@ -139,38 +185,83 @@ export default function AnalyticsClient({ devices }: { devices: Device[] }) {
           />
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between gap-3 lg:justify-end">
           {lastUpdatedAt && (
-            <span className="text-xs text-slate-400">
-              Update terakhir:{" "}
-              {lastUpdatedAt.toLocaleTimeString("id-ID", {
-                hour: "2-digit",
-                minute: "2-digit",
-                second: "2-digit",
-                timeZone: "Asia/Jakarta",
-              })}{" "}
-              WIB
+            <span className="text-[11px] text-slate-400">
+              Diperbarui{" "}
+              {lastUpdatedAt.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" })} WIB ·
+              otomatis tiap 2 menit
             </span>
           )}
           <button
             onClick={() => loadData(true)}
             disabled={loading}
-            className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-slate-900 px-3.5 py-2 text-xs font-semibold text-on-strong transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {loading ? "Memuat..." : "🔄 Refresh"}
+            <RefreshCw size={13} className={loading ? "animate-spin" : ""} aria-hidden />
+            {loading ? "Memuat" : "Segarkan"}
           </button>
         </div>
       </div>
 
       {errorMsg && <p className="text-sm text-rose-600 dark:text-rose-400">{errorMsg}</p>}
-      {loading && <p className="text-sm text-slate-500">Memuat data...</p>}
 
-      {!loading && currentStats && (
+      {loading && (
+        <div className="space-y-4" aria-busy="true" aria-label="Memuat data analitik">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="h-20 animate-pulse rounded-2xl bg-slate-100" />
+            ))}
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="h-44 animate-pulse rounded-3xl bg-slate-100" />
+            ))}
+          </div>
+          <div className="h-72 animate-pulse rounded-3xl bg-slate-100" />
+        </div>
+      )}
+
+      {!loading && currentStats && derived && (
         <>
-          <StatsSummary current={currentStats} previous={previousStats} />
-          <TrendChart readings={currentStats.series} />
-          <RainfallCharts hourBuckets={rainHourly} dayBuckets={rainDaily} />
-          <LocationComparison devices={devices} statsByDevice={statsByDevice} />
+          {currentStats.validReadings === 0 ? (
+            <div className={`${CARD} p-6 text-sm text-slate-500`}>
+              Belum ada data cuaca dari {selectedLabel} pada periode ini.
+            </div>
+          ) : (
+            <>
+              <InsightsPanel insights={derived.insights} />
+              <KpiCards current={currentStats} previous={previousStats} daily={derived.daily} rainDaily={rainDaily} />
+              <DailyRanges daily={derived.daily} />
+              <MetricTrends hourly={derived.hourly} />
+              {/* Dua kolom yang tingginya mandiri (bukan baris grid yang dipaksa
+                  sama tinggi) supaya tidak ada kartu dengan ruang kosong. */}
+              <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-3">
+                <div className="space-y-4 lg:col-span-2">
+                  <DiurnalCard diurnal={derived.diurnal} />
+                  <LocationComparison devices={devices} statsByDevice={statsByDevice} selectedId={deviceId} />
+                </div>
+                <div className="space-y-4">
+                  <WindRoseCard rose={derived.rose} />
+                  <VpdCard vpd={derived.vpd} humid90Pct={derived.humid90Pct} hot32Pct={derived.hot32Pct} />
+                </div>
+              </div>
+            </>
+          )}
+
+          <section aria-labelledby="rain-analytics-title">
+            <h2 id="rain-analytics-title" className="mb-3 text-sm font-semibold text-slate-900">
+              Curah hujan · {selectedLabel}
+            </h2>
+            <RainfallCharts hourBuckets={rainHourly} dayBuckets={rainDaily} />
+          </section>
+
+          <p className="text-[11px] leading-relaxed text-slate-400">
+            Dihitung dari {currentStats.validReadings.toLocaleString("id-ID")} pembacaan sensor cuaca
+            {currentStats.excludedReadings > 0 &&
+              ` (${currentStats.excludedReadings.toLocaleString("id-ID")} pembacaan di luar rentang wajar dikecualikan sebagai glitch sensor)`}
+            . Pembanding = periode dengan durasi sama tepat sebelum periode ini.
+          </p>
         </>
       )}
     </div>

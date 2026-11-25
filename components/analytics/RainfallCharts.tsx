@@ -57,7 +57,7 @@ function ChartCard({
   children: ReactNode;
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-surface p-4">
+    <div className="rounded-3xl bg-surface p-4 ring-1 ring-slate-200/60 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_28px_rgba(15,23,42,0.06)] sm:p-5">
       <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
         <div>
           <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
@@ -106,7 +106,7 @@ export default function RainfallCharts({
 
   if (hourBuckets.length === 0 && dayBuckets.length === 0) {
     return (
-      <div className="rounded-2xl border border-slate-200 bg-surface p-4">
+      <div className="rounded-3xl bg-surface p-4 ring-1 ring-slate-200/60 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_28px_rgba(15,23,42,0.06)] sm:p-5">
         <h3 className="text-sm font-semibold text-slate-900">Curah Hujan</h3>
         <p className="mt-2 text-sm text-slate-500">
           Belum ada data curah hujan dari sensor hujan pada periode ini.
@@ -119,7 +119,7 @@ export default function RainfallCharts({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-slate-200 bg-surface p-4">
+      <div className="rounded-3xl bg-surface p-4 ring-1 ring-slate-200/60 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_28px_rgba(15,23,42,0.06)] sm:p-5">
         <h3 className="mb-3 text-sm font-semibold text-slate-900">Ringkasan Curah Hujan</h3>
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           <StatTile label="Total periode" value={fmtMm(stats.total)} />

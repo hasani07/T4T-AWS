@@ -24,12 +24,10 @@ export default async function AnalyticsPage() {
 
   return (
     <PageShell>
-        <header className="mb-8">
-          <h1 className="text-2xl font-semibold text-slate-900">
-            Analitik &amp; Perbandingan Periode
-          </h1>
+        <header className="mb-6">
+          <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">Analitik</h1>
           <p className="mt-1 text-sm text-slate-500">
-            Statistik sensor per periode, dibandingkan dengan periode
+            Ringkasan, tren, pola harian, arah angin, dan curah hujan per lokasi — dibandingkan dengan periode
             sebelumnya yang durasinya sama.
           </p>
         </header>
